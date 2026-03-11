@@ -1,53 +1,58 @@
 # lapctl
 
-**lapctl** is an upcoming command-line utility written in Rust for managing laptop hardware features on Linux.
+**lapctl** is a powerful, dependency-free command-line utility written in Rust. It is designed to provide seamless hardware management for Linux laptops. 
 
-It aims to provide a simple and unified interface for controlling hybrid GPU modes, battery charging limits, and other laptop power features directly from the terminal.
-
----
-
-## Planned Features
-
-- Switch GPU modes on hybrid graphics laptops
-  - Integrated GPU
-  - Hybrid mode
-  - NVIDIA GPU
-
-- Set and manage battery charging limits
-- View laptop hardware and power status
-- Lightweight and fast CLI interface
-- Designed for Linux systems with hybrid GPUs (Optimus)
+By interfacing directly with the Linux kernel and ACPI endpoints, `lapctl` provides a unified interface for controlling hybrid GPU modes, battery charging thresholds, and thermal/power profiles—all from the terminal.
 
 ---
 
-## Project Status
+## Key Features
 
-**Stable**
-
-This project has reached its first stable milestone with all planned features implemented.
-
----
-
-## Goals
-
-- Provide a **simple CLI interface** for laptop hardware management
-- Support **hybrid GPU laptops (Intel + NVIDIA / AMD + NVIDIA)**
-- Offer **battery health features like charge limit control**
-- Be **lightweight, fast, and easy to use**
+- **Hybrid GPU Management:** Switch effortlessly between Integrated, Nvidia, and Hybrid graphics modes (Optimus).
+- **Battery Health:** Enforce battery charging thresholds (e.g., 80%) to maximize chemical lifespan.
+- **Power Profiling:** Dynamically adjust ACPI Platform Profiles, CPU scaling governors, and TDP (Wattage) limits.
+- **Thermal Controls:** Direct hardware hooks for proprietary cooling solutions (e.g., Lenovo Ideapad, ASUS).
+- **Hardware Polling:** Comprehensive hardware status checking without heavy daemon dependencies.
 
 ---
 
-## Example CLI (Planned)
+## Example CLI
 
 ```bash
+# GPU Modes
 lapctl gpu integrated
 lapctl gpu hybrid
 lapctl gpu nvidia
 
+# Battery Controls
 lapctl battery limit 80
 lapctl battery status
 
+# Power Profiles
+lapctl power performance
+lapctl power balanced
+lapctl power battery-save
+
+# Raw Wattage Capping
+lapctl power limit-tdp 35
+
+# Cooling/Thermal Overrides (Lenovo/ASUS)
+lapctl cooling performance
+lapctl cooling balanced
+lapctl cooling quiet
+
+# Check All Hardware
 lapctl status
+
+# --- lapctl status ---
+# GPU Mode: hybrid
+# BAT1:
+#   Capacity: 99%
+#   Status: Full
+#   Charge Limit: 100%
+# Power Profile: balanced
+# Cooling Profile: Balanced (Ideapad)
+# CPU TDP Limit: Hardware Managed
 ```
 
 ---
@@ -78,25 +83,27 @@ lapctl
 │   │   ├── gpu.rs
 │   │   ├── battery.rs
 │   │   ├── power.rs
+│   │   ├── cooling.rs
 │   │   └── status.rs
 │   │
 │   ├── hardware/
 │   │   ├── mod.rs
-│   │   ├── gpu.rs
-│   │   └── battery.rs
+│   │   └── gpu.rs
 │   │
 │   └── utils/
 │       └── system.rs
 
 ```
 
-## Roadmap
+## Core Capabilities
 
-- [x] CLI structure
-- [x] GPU mode switching
-- [x] Battery charge limit management
-- [x] Hardware status command
-- [x] Configuration support
+- [x] CLI structure and routing architecture
+- [x] GPU mode switching and configuration orchestration
+- [x] Battery charge limit management (sysfs & Ideapad conservation mode)
+- [x] Comprehensive hardware status polling
+- [x] Configuration support and state caching
+- [x] Thermal/Cooling profiles (Lenovo VPC / ASUS WMI)
+- [x] CPU TDP (Wattage) Control (Intel RAPL / AMD hwmon)
 
 ---
 

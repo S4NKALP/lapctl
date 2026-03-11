@@ -94,6 +94,10 @@ pub enum PowerCommands {
     Balanced,
     /// Set power profile to battery saver
     BatterySave,
+    /// Set CPU TDP limit (in Watts)
+    LimitTdp {
+        watts: u32,
+    },
 }
 
 #[derive(Subcommand, Debug)]
