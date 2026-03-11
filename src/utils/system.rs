@@ -19,22 +19,22 @@ pub fn create_file(path: &str, content: &str, executable: bool) {
     let path_obj = Path::new(path);
     if let Some(parent) = path_obj.parent()
         && !parent.exists()
-            && let Err(e) = fs::create_dir_all(parent) {
-                error!("Failed to create directories for '{}': {}", path, e);
-                return;
-            }
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        error!("Failed to create directories for '{}': {}", path, e);
+        return;
+    }
 
     match fs::write(path_obj, content) {
         Ok(_) => {
             info!("Created file {}", path);
             debug!("{}", content);
 
-            if executable
-                && let Ok(mut perms) = fs::metadata(path_obj).map(|m| m.permissions()) {
-                    perms.set_mode(perms.mode() | 0o111);
-                    let _ = fs::set_permissions(path_obj, perms);
-                    info!("Added execution privilege to file {}", path);
-                }
+            if executable && let Ok(mut perms) = fs::metadata(path_obj).map(|m| m.permissions()) {
+                perms.set_mode(perms.mode() | 0o111);
+                let _ = fs::set_permissions(path_obj, perms);
+                info!("Added execution privilege to file {}", path);
+            }
         }
         Err(e) => {
             error!("Failed to create file '{}': {}", path, e);
@@ -77,17 +77,18 @@ pub fn rebuild_initramfs() {
     }
 
     if let Ok(which) = Command::new("which").arg("systemd-inhibit").output()
-        && which.status.success() {
-            let mut new_cmd = vec![
-                "systemd-inhibit",
-                "--who=lapctl",
-                "--why",
-                "Rebuilding initramfs",
-                "--",
-            ];
-            new_cmd.extend(command.iter());
-            command = new_cmd;
-        }
+        && which.status.success()
+    {
+        let mut new_cmd = vec![
+            "systemd-inhibit",
+            "--who=lapctl",
+            "--why",
+            "Rebuilding initramfs",
+            "--",
+        ];
+        new_cmd.extend(command.iter());
+        command = new_cmd;
+    }
 
     if !command.is_empty() {
         println!("Rebuilding the initramfs...");
