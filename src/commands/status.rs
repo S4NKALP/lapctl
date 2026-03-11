@@ -26,9 +26,23 @@ pub fn execute() {
                 println!("  Capacity: {}%", capacity.trim());
                 println!("  Status: {}", status.trim());
                 
-                // Print charing limit if exists (e.g., charge_control_end_threshold)
                 if let Ok(limit) = fs::read_to_string(bat_path.join("charge_control_end_threshold")) {
                     println!("  Charge Limit: {}%", limit.trim());
+                } else {
+                    if let Ok(ideapad_entries) = fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi") {
+                        for ideapad_entry in ideapad_entries.flatten() {
+                            let conservation_path = ideapad_entry.path().join("conservation_mode");
+                            if conservation_path.exists() {
+                                if let Ok(mode) = fs::read_to_string(&conservation_path) {
+                                    if mode.trim() == "1" {
+                                        println!("  Charge Limit: Conservation Mode (~60%)");
+                                    } else {
+                                        println!("  Charge Limit: 100%");
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
