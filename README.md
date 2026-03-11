@@ -93,10 +93,10 @@ lapctl
 
 ## Roadmap
 
-- [ ] CLI structure
-- [ ] GPU mode switching
+- [x] CLI structure
+- [x] GPU mode switching
 - [ ] Battery charge limit management
-- [ ] Hardware status command
+- [x] Hardware status command
 - [ ] Configuration support
 
 ---
