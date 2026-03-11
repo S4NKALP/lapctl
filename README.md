@@ -13,18 +13,23 @@ You can use it to change your graphics card mode, set battery charge limits, pic
 ## What It Can Do
 
 **Graphics Control**
+
 Easily switch between Integrated, Nvidia, and Hybrid graphics modes to save battery or get more power.
 
 **Battery Health**
+
 Set a battery charge limit like 80% to make your battery last longer over the years.
 
 **Power Saving**
+
 Change power profiles and set CPU power limits to save energy when you need it.
 
 **Cooling Control**
+
 Control the cooling fans for laptops like Lenovo or ASUS to keep your computer quiet or cool.
 
 **Hardware Status**
+
 Check the status of your battery, graphics, and power all in one place.
 
 ---
@@ -100,13 +105,13 @@ lapctl
 
 ## Project Goals Finished
 
-[x] CLI setup and routing
-[x] Graphics switching
-[x] Battery limits tools
-[x] System status checking
-[x] Tool configuration saving
-[x] Cooling fan setup
-[x] CPU power limit setup
+- [x] CLI setup and routing
+- [x] Graphics switching (Wayland & Xorg)
+- [x] Battery limits tools
+- [x] System status checking
+- [x] Tool configuration saving
+- [x] Cooling fan setup
+- [x] CPU power limit setup
 
 ---
 
