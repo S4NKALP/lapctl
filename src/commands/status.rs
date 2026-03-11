@@ -39,13 +39,14 @@ pub fn execute() {
                         for ideapad_entry in ideapad_entries.flatten() {
                             let conservation_path = ideapad_entry.path().join("conservation_mode");
                             if conservation_path.exists()
-                                && let Ok(mode) = fs::read_to_string(&conservation_path) {
-                                    if mode.trim() == "1" {
-                                        println!("  Charge Limit: Conservation Mode (~60%)");
-                                    } else {
-                                        println!("  Charge Limit: 100%");
-                                    }
+                                && let Ok(mode) = fs::read_to_string(&conservation_path)
+                            {
+                                if mode.trim() == "1" {
+                                    println!("  Charge Limit: Conservation Mode (~60%)");
+                                } else {
+                                    println!("  Charge Limit: 100%");
                                 }
+                            }
                         }
                     }
                 }
@@ -66,31 +67,33 @@ pub fn execute() {
         for ideapad_entry in ideapad_entries.flatten() {
             let fan_path = ideapad_entry.path().join("fan_mode");
             if fan_path.exists()
-                && let Ok(mode) = fs::read_to_string(&fan_path) {
-                    thermal_found = true;
-                    let desc = match mode.trim() {
-                        "1" => "Performance",
-                        "0" => "Balanced",
-                        "2" => "Quiet / Battery Saving",
-                        _ => mode.trim(),
-                    };
-                    println!("Cooling Profile: {} (Ideapad)", desc);
-                }
+                && let Ok(mode) = fs::read_to_string(&fan_path)
+            {
+                thermal_found = true;
+                let desc = match mode.trim() {
+                    "1" => "Performance",
+                    "0" => "Balanced",
+                    "2" => "Quiet / Battery Saving",
+                    _ => mode.trim(),
+                };
+                println!("Cooling Profile: {} (Ideapad)", desc);
+            }
         }
     }
 
     let asus_path = Path::new("/sys/devices/platform/asus-nb-wmi/throttle_thermal_policy");
     if asus_path.exists()
-        && let Ok(mode) = fs::read_to_string(asus_path) {
-            thermal_found = true;
-            let desc = match mode.trim() {
-                "1" => "Performance",
-                "0" => "Balanced",
-                "2" => "Quiet / Battery Saving",
-                _ => mode.trim(),
-            };
-            println!("Cooling Profile: {} (ASUS)", desc);
-        }
+        && let Ok(mode) = fs::read_to_string(asus_path)
+    {
+        thermal_found = true;
+        let desc = match mode.trim() {
+            "1" => "Performance",
+            "0" => "Balanced",
+            "2" => "Quiet / Battery Saving",
+            _ => mode.trim(),
+        };
+        println!("Cooling Profile: {} (ASUS)", desc);
+    }
 
     if !thermal_found {
         println!("Cooling Profile: Unknown / Firmware managed");
@@ -102,48 +105,49 @@ pub fn execute() {
     // Check Intel RAPL
     let rapl_dir = Path::new("/sys/class/powercap/intel-rapl");
     if rapl_dir.exists()
-        && let Ok(entries) = fs::read_dir(rapl_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = path.file_name().unwrap_or_default().to_string_lossy();
+        && let Ok(entries) = fs::read_dir(rapl_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
 
-                if name.starts_with("intel-rapl:") {
-                    let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
-                    if constraint_0.exists()
-                        && let Ok(limit_uw) = fs::read_to_string(&constraint_0)
-                            && let Ok(limit) = limit_uw.trim().parse::<u64>() {
-                                println!("CPU TDP Limit: {}W (Intel RAPL PL1)", limit / 1_000_000);
-                                tdp_found = true;
-                                break;
-                            }
+            if name.starts_with("intel-rapl:") {
+                let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
+                if constraint_0.exists()
+                    && let Ok(limit_uw) = fs::read_to_string(&constraint_0)
+                    && let Ok(limit) = limit_uw.trim().parse::<u64>()
+                {
+                    println!("CPU TDP Limit: {}W (Intel RAPL PL1)", limit / 1_000_000);
+                    tdp_found = true;
+                    break;
                 }
             }
         }
+    }
 
     // Check AMD HWMon
     if !tdp_found {
         let hwmon_dir = Path::new("/sys/class/hwmon");
         if hwmon_dir.exists()
-            && let Ok(entries) = fs::read_dir(hwmon_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    let power1_cap = path.join("power1_cap");
-                    let name_path = path.join("name");
+            && let Ok(entries) = fs::read_dir(hwmon_dir)
+        {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let power1_cap = path.join("power1_cap");
+                let name_path = path.join("name");
 
-                    if power1_cap.exists()
-                        && let Ok(name) = fs::read_to_string(&name_path)
-                            && name.trim().contains("amd")
-                                && let Ok(limit_uw) = fs::read_to_string(&power1_cap)
-                                    && let Ok(limit) = limit_uw.trim().parse::<u64>() {
-                                        println!(
-                                            "CPU TDP Limit: {}W (AMD hwmon)",
-                                            limit / 1_000_000
-                                        );
-                                        tdp_found = true;
-                                        break;
-                                    }
+                if power1_cap.exists()
+                    && let Ok(name) = fs::read_to_string(&name_path)
+                    && name.trim().contains("amd")
+                    && let Ok(limit_uw) = fs::read_to_string(&power1_cap)
+                    && let Ok(limit) = limit_uw.trim().parse::<u64>()
+                {
+                    println!("CPU TDP Limit: {}W (AMD hwmon)", limit / 1_000_000);
+                    tdp_found = true;
+                    break;
                 }
             }
+        }
     }
 
     if !tdp_found {

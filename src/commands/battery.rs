@@ -120,15 +120,14 @@ pub fn execute(command: &BatteryCommands) {
                                     let conservation_path =
                                         ideapad_entry.path().join("conservation_mode");
                                     if conservation_path.exists()
-                                        && let Ok(mode) = fs::read_to_string(&conservation_path) {
-                                            if mode.trim() == "1" {
-                                                println!(
-                                                    "  Charge Limit: Conservation Mode (~60%)"
-                                                );
-                                            } else {
-                                                println!("  Charge Limit: 100%");
-                                            }
+                                        && let Ok(mode) = fs::read_to_string(&conservation_path)
+                                    {
+                                        if mode.trim() == "1" {
+                                            println!("  Charge Limit: Conservation Mode (~60%)");
+                                        } else {
+                                            println!("  Charge Limit: 100%");
                                         }
+                                    }
                                 }
                             }
                         }

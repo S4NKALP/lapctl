@@ -14,8 +14,7 @@ fn set_cpu_governor(governor: &str) {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if name.starts_with("cpu") && name.chars().nth(3).is_some_and(|c| c.is_ascii_digit())
-            {
+            if name.starts_with("cpu") && name.chars().nth(3).is_some_and(|c| c.is_ascii_digit()) {
                 let scaling_gov_path = path.join("cpufreq/scaling_governor");
                 if scaling_gov_path.exists() {
                     match fs::write(&scaling_gov_path, governor) {
@@ -48,8 +47,7 @@ fn set_energy_performance_preference(epp: &str) {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if name.starts_with("cpu") && name.chars().nth(3).is_some_and(|c| c.is_ascii_digit())
-            {
+            if name.starts_with("cpu") && name.chars().nth(3).is_some_and(|c| c.is_ascii_digit()) {
                 let epp_path = path.join("cpufreq/energy_performance_preference");
                 if epp_path.exists() {
                     match fs::write(&epp_path, epp) {
@@ -75,39 +73,40 @@ fn set_intel_rapl_limit(watts: u32) -> bool {
     // Intel RAPL
     let rapl_dir = Path::new("/sys/class/powercap/intel-rapl");
     if rapl_dir.exists()
-        && let Ok(entries) = fs::read_dir(rapl_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = path.file_name().unwrap_or_default().to_string_lossy();
+        && let Ok(entries) = fs::read_dir(rapl_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
 
-                // Set limits for package-0 (entire CPU package)
-                if name.starts_with("intel-rapl:") {
-                    let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
-                    let constraint_1 = path.join("constraint_1_power_limit_uw"); // PL2
+            // Set limits for package-0 (entire CPU package)
+            if name.starts_with("intel-rapl:") {
+                let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
+                let constraint_1 = path.join("constraint_1_power_limit_uw"); // PL2
 
-                    if constraint_0.exists() {
-                        match fs::write(&constraint_0, microwatts.to_string()) {
-                            Ok(_) => {
-                                log::debug!("Set RAPL constraint 0 to {}uW", microwatts);
-                                success = true;
-                            }
-                            Err(e) => log::debug!("Failed to write RAPL 0: {}", e),
+                if constraint_0.exists() {
+                    match fs::write(&constraint_0, microwatts.to_string()) {
+                        Ok(_) => {
+                            log::debug!("Set RAPL constraint 0 to {}uW", microwatts);
+                            success = true;
                         }
+                        Err(e) => log::debug!("Failed to write RAPL 0: {}", e),
                     }
-                    if constraint_1.exists() {
-                        // Usually PL2 (Boost limit) is set ~20% higher than PL1 (Sustained limit)
-                        // But for a strict override we clamp BOTH to the requested static wattage limit.
-                        match fs::write(&constraint_1, microwatts.to_string()) {
-                            Ok(_) => {
-                                log::debug!("Set RAPL constraint 1 to {}uW", microwatts);
-                                success = true;
-                            }
-                            Err(e) => log::debug!("Failed to write RAPL 1: {}", e),
+                }
+                if constraint_1.exists() {
+                    // Usually PL2 (Boost limit) is set ~20% higher than PL1 (Sustained limit)
+                    // But for a strict override we clamp BOTH to the requested static wattage limit.
+                    match fs::write(&constraint_1, microwatts.to_string()) {
+                        Ok(_) => {
+                            log::debug!("Set RAPL constraint 1 to {}uW", microwatts);
+                            success = true;
                         }
+                        Err(e) => log::debug!("Failed to write RAPL 1: {}", e),
                     }
                 }
             }
         }
+    }
     success
 }
 
@@ -118,27 +117,29 @@ fn set_amd_hwmon_limit(watts: u32) -> bool {
     // AMD hwmon (Typically exposed via hwmon platform drivers like k10temp or amd_pmc)
     let hwmon_dir = Path::new("/sys/class/hwmon");
     if hwmon_dir.exists()
-        && let Ok(entries) = fs::read_dir(hwmon_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let power1_cap = path.join("power1_cap");
-                let name_path = path.join("name");
+        && let Ok(entries) = fs::read_dir(hwmon_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let power1_cap = path.join("power1_cap");
+            let name_path = path.join("name");
 
-                if power1_cap.exists() {
-                    // Try to verify this is actually the CPU and not a generic sensor
-                    if let Ok(name) = fs::read_to_string(&name_path)
-                        && name.trim().contains("amd") {
-                            match fs::write(&power1_cap, microwatts.to_string()) {
-                                Ok(_) => {
-                                    log::debug!("Set AMD hwmon power1_cap to {}uW", microwatts);
-                                    success = true;
-                                }
-                                Err(e) => log::debug!("Failed to write AMD hwmon: {}", e),
-                            }
+            if power1_cap.exists() {
+                // Try to verify this is actually the CPU and not a generic sensor
+                if let Ok(name) = fs::read_to_string(&name_path)
+                    && name.trim().contains("amd")
+                {
+                    match fs::write(&power1_cap, microwatts.to_string()) {
+                        Ok(_) => {
+                            log::debug!("Set AMD hwmon power1_cap to {}uW", microwatts);
+                            success = true;
                         }
+                        Err(e) => log::debug!("Failed to write AMD hwmon: {}", e),
+                    }
                 }
             }
         }
+    }
     success
 }
 fn set_platform_profile(profile: &str) {

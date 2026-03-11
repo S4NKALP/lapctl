@@ -270,9 +270,10 @@ fn create_cache_file() {
     }
 
     if let Ok(json) = serde_json::to_string_pretty(&cache)
-        && fs::write(CACHE_FILE_PATH, json).is_ok() {
-            log::debug!("Created file {}", CACHE_FILE_PATH);
-        }
+        && fs::write(CACHE_FILE_PATH, json).is_ok()
+    {
+        log::debug!("Created file {}", CACHE_FILE_PATH);
+    }
 }
 
 fn read_cache_file() -> Result<Cache, String> {
