@@ -33,4 +33,11 @@ pub fn execute() {
             }
         }
     }
+
+    // Power Profile Status
+    if let Ok(profile) = fs::read_to_string("/sys/firmware/acpi/platform_profile") {
+        println!("Power Profile: {}", profile.trim());
+    } else {
+        println!("Power Profile: Unknown");
+    }
 }
