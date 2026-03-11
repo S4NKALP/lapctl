@@ -269,11 +269,10 @@ fn create_cache_file() {
         let _ = fs::create_dir_all(parent);
     }
 
-    if let Ok(json) = serde_json::to_string_pretty(&cache) {
-        if fs::write(CACHE_FILE_PATH, json).is_ok() {
+    if let Ok(json) = serde_json::to_string_pretty(&cache)
+        && fs::write(CACHE_FILE_PATH, json).is_ok() {
             log::debug!("Created file {}", CACHE_FILE_PATH);
         }
-    }
 }
 
 fn read_cache_file() -> Result<Cache, String> {
@@ -296,7 +295,7 @@ fn switch_integrated() {
 
     let is_debug = log::log_enabled!(log::Level::Debug);
     let mut dis_cmd = Command::new("systemctl");
-    dis_cmd.args(&["disable", "nvidia-persistenced.service"]);
+    dis_cmd.args(["disable", "nvidia-persistenced.service"]);
     if !is_debug {
         dis_cmd.stdout(std::process::Stdio::null());
         dis_cmd.stderr(std::process::Stdio::null());
@@ -337,7 +336,7 @@ fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool) {
     // persistenced enable
     let is_debug = log::log_enabled!(log::Level::Debug);
     let mut enable_cmd = Command::new("systemctl");
-    enable_cmd.args(&["enable", "nvidia-persistenced.service"]);
+    enable_cmd.args(["enable", "nvidia-persistenced.service"]);
     if !is_debug {
         enable_cmd.stdout(std::process::Stdio::null());
         enable_cmd.stderr(std::process::Stdio::null());
@@ -390,7 +389,7 @@ fn switch_nvidia(
     // persistenced enable
     let is_debug = log::log_enabled!(log::Level::Debug);
     let mut enable_cmd = Command::new("systemctl");
-    enable_cmd.args(&["enable", "nvidia-persistenced.service"]);
+    enable_cmd.args(["enable", "nvidia-persistenced.service"]);
     if !is_debug {
         enable_cmd.stdout(std::process::Stdio::null());
         enable_cmd.stderr(std::process::Stdio::null());
@@ -454,7 +453,7 @@ fn switch_nvidia(
             create_file(EXTRA_XORG_PATH, &extra_xorg, false);
         }
 
-        let display_manager = dm.or_else(|| get_display_manager());
+        let display_manager = dm.or_else(get_display_manager);
 
         if let Some(cdm) = display_manager {
             if cdm == "sddm" {
@@ -537,7 +536,7 @@ pub fn execute(cmd: &GpuCommands) {
         GpuCommands::Hybrid {
             rtd3,
             use_nvidia_current,
-        } => switch_hybrid(rtd3.clone(), *use_nvidia_current),
+        } => switch_hybrid(*rtd3, *use_nvidia_current),
         GpuCommands::Nvidia {
             dm,
             force_comp,
@@ -547,7 +546,7 @@ pub fn execute(cmd: &GpuCommands) {
         } => switch_nvidia(
             dm.clone(),
             *force_comp,
-            coolbits.clone(),
+            *coolbits,
             *use_nvidia_current,
             *wayland,
         ),

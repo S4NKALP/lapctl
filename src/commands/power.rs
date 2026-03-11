@@ -14,7 +14,7 @@ fn set_cpu_governor(governor: &str) {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if name.starts_with("cpu") && name.chars().nth(3).map_or(false, |c| c.is_ascii_digit())
+            if name.starts_with("cpu") && name.chars().nth(3).is_some_and(|c| c.is_ascii_digit())
             {
                 let scaling_gov_path = path.join("cpufreq/scaling_governor");
                 if scaling_gov_path.exists() {
@@ -48,7 +48,7 @@ fn set_energy_performance_preference(epp: &str) {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if name.starts_with("cpu") && name.chars().nth(3).map_or(false, |c| c.is_ascii_digit())
+            if name.starts_with("cpu") && name.chars().nth(3).is_some_and(|c| c.is_ascii_digit())
             {
                 let epp_path = path.join("cpufreq/energy_performance_preference");
                 if epp_path.exists() {
@@ -74,8 +74,8 @@ fn set_intel_rapl_limit(watts: u32) -> bool {
 
     // Intel RAPL
     let rapl_dir = Path::new("/sys/class/powercap/intel-rapl");
-    if rapl_dir.exists() {
-        if let Ok(entries) = fs::read_dir(rapl_dir) {
+    if rapl_dir.exists()
+        && let Ok(entries) = fs::read_dir(rapl_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let name = path.file_name().unwrap_or_default().to_string_lossy();
@@ -108,7 +108,6 @@ fn set_intel_rapl_limit(watts: u32) -> bool {
                 }
             }
         }
-    }
     success
 }
 
@@ -118,8 +117,8 @@ fn set_amd_hwmon_limit(watts: u32) -> bool {
 
     // AMD hwmon (Typically exposed via hwmon platform drivers like k10temp or amd_pmc)
     let hwmon_dir = Path::new("/sys/class/hwmon");
-    if hwmon_dir.exists() {
-        if let Ok(entries) = fs::read_dir(hwmon_dir) {
+    if hwmon_dir.exists()
+        && let Ok(entries) = fs::read_dir(hwmon_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let power1_cap = path.join("power1_cap");
@@ -127,8 +126,8 @@ fn set_amd_hwmon_limit(watts: u32) -> bool {
 
                 if power1_cap.exists() {
                     // Try to verify this is actually the CPU and not a generic sensor
-                    if let Ok(name) = fs::read_to_string(&name_path) {
-                        if name.trim().contains("amd") {
+                    if let Ok(name) = fs::read_to_string(&name_path)
+                        && name.trim().contains("amd") {
                             match fs::write(&power1_cap, microwatts.to_string()) {
                                 Ok(_) => {
                                     log::debug!("Set AMD hwmon power1_cap to {}uW", microwatts);
@@ -137,11 +136,9 @@ fn set_amd_hwmon_limit(watts: u32) -> bool {
                                 Err(e) => log::debug!("Failed to write AMD hwmon: {}", e),
                             }
                         }
-                    }
                 }
             }
         }
-    }
     success
 }
 fn set_platform_profile(profile: &str) {

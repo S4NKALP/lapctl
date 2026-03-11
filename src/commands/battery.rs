@@ -6,7 +6,7 @@ use std::path::Path;
 pub fn execute(command: &BatteryCommands) {
     match command {
         BatteryCommands::Limit { percent } => {
-            if percent < &1 || percent > &100 {
+            if !(&1..=&100).contains(&percent) {
                 error!("Invalid percentage. Please provide a value between 1 and 100.");
                 std::process::exit(1);
             }
@@ -119,8 +119,8 @@ pub fn execute(command: &BatteryCommands) {
                                 for ideapad_entry in ideapad_entries.flatten() {
                                     let conservation_path =
                                         ideapad_entry.path().join("conservation_mode");
-                                    if conservation_path.exists() {
-                                        if let Ok(mode) = fs::read_to_string(&conservation_path) {
+                                    if conservation_path.exists()
+                                        && let Ok(mode) = fs::read_to_string(&conservation_path) {
                                             if mode.trim() == "1" {
                                                 println!(
                                                     "  Charge Limit: Conservation Mode (~60%)"
@@ -129,7 +129,6 @@ pub fn execute(command: &BatteryCommands) {
                                                 println!("  Charge Limit: 100%");
                                             }
                                         }
-                                    }
                                 }
                             }
                         }
