@@ -32,6 +32,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: PowerCommands,
     },
+    /// Cooling and thermal management
+    Cooling {
+        #[command(subcommand)]
+        command: CoolingCommands,
+    },
     /// Hardware status
     Status,
 }
@@ -89,6 +94,16 @@ pub enum PowerCommands {
     Balanced,
     /// Set power profile to battery saver
     BatterySave,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CoolingCommands {
+    /// Set extreme performance fan/thermal mode
+    Performance,
+    /// Set balanced/intelligent cooling mode
+    Balanced,
+    /// Set quiet/battery saving fan mode
+    Quiet,
 }
 
 #[derive(Subcommand, Debug)]

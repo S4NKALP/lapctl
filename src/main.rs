@@ -16,16 +16,20 @@ fn main() {
         log::LevelFilter::Info
     };
 
+    use std::io::Write;
     env_logger::Builder::new()
         .filter_level(level)
-        .format_timestamp(None)
-        .format_module_path(false)
+        .format(|buf, record| {
+            // Write only [LEVEL] message
+            writeln!(buf, "[{}] {}", record.level(), record.args())
+        })
         .init();
 
     match &cli.command {
         Commands::Gpu { command } => commands::gpu::execute(command),
         Commands::Battery { command } => commands::battery::execute(command),
         Commands::Power { command } => commands::power::execute(command),
+        Commands::Cooling { command } => commands::cooling::execute(command),
         Commands::Status => commands::status::execute(),
     }
 }
