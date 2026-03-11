@@ -1,5 +1,4 @@
 use crate::cli::PowerCommands;
-use crate::utils::system::assert_root;
 use log::{error, info};
 use std::fs;
 use std::path::Path;
@@ -15,7 +14,8 @@ fn set_cpu_governor(governor: &str) {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if name.starts_with("cpu") && name.chars().nth(3).map_or(false, |c| c.is_ascii_digit()) {
+            if name.starts_with("cpu") && name.chars().nth(3).map_or(false, |c| c.is_ascii_digit())
+            {
                 let scaling_gov_path = path.join("cpufreq/scaling_governor");
                 if scaling_gov_path.exists() {
                     match fs::write(&scaling_gov_path, governor) {
@@ -28,7 +28,10 @@ fn set_cpu_governor(governor: &str) {
     }
 
     if success_count > 0 {
-        info!("Set CPU scaling governor to '{}' on {} cores", governor, success_count);
+        info!(
+            "Set CPU scaling governor to '{}' on {} cores",
+            governor, success_count
+        );
     } else {
         log::debug!("Could not set CPU scaling governor");
     }
@@ -45,7 +48,8 @@ fn set_energy_performance_preference(epp: &str) {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if name.starts_with("cpu") && name.chars().nth(3).map_or(false, |c| c.is_ascii_digit()) {
+            if name.starts_with("cpu") && name.chars().nth(3).map_or(false, |c| c.is_ascii_digit())
+            {
                 let epp_path = path.join("cpufreq/energy_performance_preference");
                 if epp_path.exists() {
                     match fs::write(&epp_path, epp) {
@@ -58,13 +62,16 @@ fn set_energy_performance_preference(epp: &str) {
     }
 
     if success_count > 0 {
-        info!("Set Energy Performance Preference to '{}' on {} cores", epp, success_count);
+        info!(
+            "Set Energy Performance Preference to '{}' on {} cores",
+            epp, success_count
+        );
     }
 }
 fn set_intel_rapl_limit(watts: u32) -> bool {
     let mut success = false;
     let microwatts = watts * 1_000_000;
-    
+
     // Intel RAPL
     let rapl_dir = Path::new("/sys/class/powercap/intel-rapl");
     if rapl_dir.exists() {
@@ -72,12 +79,12 @@ fn set_intel_rapl_limit(watts: u32) -> bool {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let name = path.file_name().unwrap_or_default().to_string_lossy();
-                
+
                 // Set limits for package-0 (entire CPU package)
                 if name.starts_with("intel-rapl:") {
                     let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
                     let constraint_1 = path.join("constraint_1_power_limit_uw"); // PL2
-                    
+
                     if constraint_0.exists() {
                         match fs::write(&constraint_0, microwatts.to_string()) {
                             Ok(_) => {
@@ -108,7 +115,7 @@ fn set_intel_rapl_limit(watts: u32) -> bool {
 fn set_amd_hwmon_limit(watts: u32) -> bool {
     let mut success = false;
     let microwatts = watts * 1_000_000;
-    
+
     // AMD hwmon (Typically exposed via hwmon platform drivers like k10temp or amd_pmc)
     let hwmon_dir = Path::new("/sys/class/hwmon");
     if hwmon_dir.exists() {
@@ -117,7 +124,7 @@ fn set_amd_hwmon_limit(watts: u32) -> bool {
                 let path = entry.path();
                 let power1_cap = path.join("power1_cap");
                 let name_path = path.join("name");
-                
+
                 if power1_cap.exists() {
                     // Try to verify this is actually the CPU and not a generic sensor
                     if let Ok(name) = fs::read_to_string(&name_path) {
@@ -150,8 +157,6 @@ fn set_platform_profile(profile: &str) {
 }
 
 pub fn execute(command: &PowerCommands) {
-    assert_root();
-
     match command {
         PowerCommands::Performance => {
             println!("Setting power profile to Performance");
@@ -163,9 +168,9 @@ pub fn execute(command: &PowerCommands) {
         PowerCommands::Balanced => {
             println!("Setting power profile to Balanced");
             set_platform_profile("balanced");
-            // Schedutil is the modern balanced default. Fallback isn't critical since cpufreq 
+            // Schedutil is the modern balanced default. Fallback isn't critical since cpufreq
             // usually rejects invalid profiles, and standard Intel/AMD systems use EPP now anyway.
-            set_cpu_governor("schedutil"); 
+            set_cpu_governor("schedutil");
             set_energy_performance_preference("balance_performance");
             println!("Operation completed successfully.");
         }
@@ -178,7 +183,7 @@ pub fn execute(command: &PowerCommands) {
         }
         PowerCommands::LimitTdp { watts } => {
             println!("Setting CPU Package TDP Limit to {} Watts...", watts);
-            
+
             let mut applied = false;
             if set_intel_rapl_limit(*watts) {
                 applied = true;
@@ -188,11 +193,13 @@ pub fn execute(command: &PowerCommands) {
                 applied = true;
                 println!("Successfully applied AMD HWMon power capping.");
             }
-            
+
             if applied {
                 println!("Operation completed successfully.");
             } else {
-                error!("Hardware does not support dynamic powercap limits via intel-rapl or standard hwmon.");
+                error!(
+                    "Hardware does not support dynamic powercap limits via intel-rapl or standard hwmon."
+                );
             }
         }
     }

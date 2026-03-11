@@ -10,7 +10,7 @@ pub fn execute() {
     println!("GPU Mode: {}", current_mode);
 
     // Battery Limit / Status checks (we can peek into typical battery paths)
-    // Note: this assumes a typical sysfs structure. A complete implementation 
+    // Note: this assumes a typical sysfs structure. A complete implementation
     // would parse /sys/class/power_supply/BAT0 or similar.
     let sys_class_power = "/sys/class/power_supply";
     if let Ok(entries) = fs::read_dir(sys_class_power) {
@@ -19,18 +19,23 @@ pub fn execute() {
             let name_str = name.to_string_lossy();
             if name_str.starts_with("BAT") {
                 let bat_path = entry.path();
-                
-                let capacity = fs::read_to_string(bat_path.join("capacity")).unwrap_or_else(|_| "Unknown".into());
-                let status = fs::read_to_string(bat_path.join("status")).unwrap_or_else(|_| "Unknown".into());
-                
+
+                let capacity = fs::read_to_string(bat_path.join("capacity"))
+                    .unwrap_or_else(|_| "Unknown".into());
+                let status = fs::read_to_string(bat_path.join("status"))
+                    .unwrap_or_else(|_| "Unknown".into());
+
                 println!("{}:", name_str);
                 println!("  Capacity: {}%", capacity.trim());
                 println!("  Status: {}", status.trim());
-                
-                if let Ok(limit) = fs::read_to_string(bat_path.join("charge_control_end_threshold")) {
+
+                if let Ok(limit) = fs::read_to_string(bat_path.join("charge_control_end_threshold"))
+                {
                     println!("  Charge Limit: {}%", limit.trim());
                 } else {
-                    if let Ok(ideapad_entries) = fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi") {
+                    if let Ok(ideapad_entries) =
+                        fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi")
+                    {
                         for ideapad_entry in ideapad_entries.flatten() {
                             let conservation_path = ideapad_entry.path().join("conservation_mode");
                             if conservation_path.exists() {
@@ -68,7 +73,7 @@ pub fn execute() {
                         "1" => "Performance",
                         "0" => "Balanced",
                         "2" => "Quiet / Battery Saving",
-                        _ => mode.trim()
+                        _ => mode.trim(),
                     };
                     println!("Cooling Profile: {} (Ideapad)", desc);
                 }
@@ -84,7 +89,7 @@ pub fn execute() {
                 "1" => "Performance",
                 "0" => "Balanced",
                 "2" => "Quiet / Battery Saving",
-                _ => mode.trim()
+                _ => mode.trim(),
             };
             println!("Cooling Profile: {} (ASUS)", desc);
         }
@@ -96,7 +101,7 @@ pub fn execute() {
 
     // TDP Limit Status
     let mut tdp_found = false;
-    
+
     // Check Intel RAPL
     let rapl_dir = Path::new("/sys/class/powercap/intel-rapl");
     if rapl_dir.exists() {
@@ -104,7 +109,7 @@ pub fn execute() {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let name = path.file_name().unwrap_or_default().to_string_lossy();
-                
+
                 if name.starts_with("intel-rapl:") {
                     let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
                     if constraint_0.exists() {
@@ -130,13 +135,16 @@ pub fn execute() {
                     let path = entry.path();
                     let power1_cap = path.join("power1_cap");
                     let name_path = path.join("name");
-                    
+
                     if power1_cap.exists() {
                         if let Ok(name) = fs::read_to_string(&name_path) {
                             if name.trim().contains("amd") {
                                 if let Ok(limit_uw) = fs::read_to_string(&power1_cap) {
                                     if let Ok(limit) = limit_uw.trim().parse::<u64>() {
-                                        println!("CPU TDP Limit: {}W (AMD hwmon)", limit / 1_000_000);
+                                        println!(
+                                            "CPU TDP Limit: {}W (AMD hwmon)",
+                                            limit / 1_000_000
+                                        );
                                         tdp_found = true;
                                         break;
                                     }

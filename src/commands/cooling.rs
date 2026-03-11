@@ -1,5 +1,4 @@
 use crate::cli::CoolingCommands;
-use crate::utils::system::assert_root;
 use log::{debug, info};
 use std::fs;
 use std::path::Path;
@@ -38,10 +37,7 @@ fn set_asus_throttle_policy(mode: &str) -> bool {
     success
 }
 
-
 pub fn execute(command: &CoolingCommands) {
-    assert_root();
-
     let (ideapad_mode, asus_mode, desc) = match command {
         CoolingCommands::Performance => ("1", "1", "Performance"),
         CoolingCommands::Balanced => ("0", "0", "Balanced"),
@@ -55,7 +51,7 @@ pub fn execute(command: &CoolingCommands) {
         applied = true;
         println!("Ideapad fan mode applied.");
     }
-    
+
     if set_asus_throttle_policy(asus_mode) {
         applied = true;
         println!("ASUS thermal policy applied.");
