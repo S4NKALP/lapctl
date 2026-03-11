@@ -22,10 +22,9 @@ It aims to provide a simple and unified interface for controlling hybrid GPU mod
 
 ## Project Status
 
-**Work in progress**
+**Stable**
 
-This project is currently in early development.
-Features, commands may change as development progresses.
+This project has reached its first stable milestone with all planned features implemented.
 
 ---
 
@@ -95,9 +94,9 @@ lapctl
 
 - [x] CLI structure
 - [x] GPU mode switching
-- [ ] Battery charge limit management
+- [x] Battery charge limit management
 - [x] Hardware status command
-- [ ] Configuration support
+- [x] Configuration support
 
 ---
 
