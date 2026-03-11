@@ -1,5 +1,6 @@
 use crate::hardware::gpu;
 use std::fs;
+use std::path::Path;
 
 pub fn execute() {
     println!("--- lapctl status ---");
@@ -53,5 +54,43 @@ pub fn execute() {
         println!("Power Profile: {}", profile.trim());
     } else {
         println!("Power Profile: Unknown");
+    }
+
+    // Cooling / Thermal Status
+    let mut thermal_found = false;
+    if let Ok(ideapad_entries) = fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi") {
+        for ideapad_entry in ideapad_entries.flatten() {
+            let fan_path = ideapad_entry.path().join("fan_mode");
+            if fan_path.exists() {
+                if let Ok(mode) = fs::read_to_string(&fan_path) {
+                    thermal_found = true;
+                    let desc = match mode.trim() {
+                        "1" => "Performance",
+                        "0" => "Balanced",
+                        "2" => "Quiet / Battery Saving",
+                        _ => mode.trim()
+                    };
+                    println!("Cooling Profile: {} (Ideapad)", desc);
+                }
+            }
+        }
+    }
+
+    let asus_path = Path::new("/sys/devices/platform/asus-nb-wmi/throttle_thermal_policy");
+    if asus_path.exists() {
+        if let Ok(mode) = fs::read_to_string(asus_path) {
+            thermal_found = true;
+            let desc = match mode.trim() {
+                "1" => "Performance",
+                "0" => "Balanced",
+                "2" => "Quiet / Battery Saving",
+                _ => mode.trim()
+            };
+            println!("Cooling Profile: {} (ASUS)", desc);
+        }
+    }
+
+    if !thermal_found {
+        println!("Cooling Profile: Unknown / Firmware managed");
     }
 }
