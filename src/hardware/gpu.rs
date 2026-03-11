@@ -21,11 +21,15 @@ pub fn get_current_mode() -> String {
 }
 
 pub fn get_nvidia_gpu_pci_bus() -> String {
-    let output = Command::new("lspci").output().expect("Failed to execute lspci");
+    let output = Command::new("lspci")
+        .output()
+        .expect("Failed to execute lspci");
     let lspci_output = String::from_utf8_lossy(&output.stdout);
 
     for line in lspci_output.lines() {
-        if line.contains("NVIDIA") && (line.contains("VGA compatible controller") || line.contains("3D controller")) {
+        if line.contains("NVIDIA")
+            && (line.contains("VGA compatible controller") || line.contains("3D controller"))
+        {
             let pci_bus_id_raw = line.split_whitespace().next().unwrap();
             let pci_bus_id = pci_bus_id_raw.replace("0000:", "");
             info!("Found Nvidia GPU at {}", pci_bus_id);
@@ -75,7 +79,10 @@ pub fn get_amd_igpu_name() -> Option<String> {
         return None;
     }
 
-    let output = Command::new("xrandr").arg("--listproviders").output().ok()?;
+    let output = Command::new("xrandr")
+        .arg("--listproviders")
+        .output()
+        .ok()?;
     let xrandr_output = String::from_utf8_lossy(&output.stdout);
 
     let pattern = Regex::new(r"name:.*(ATI|AMD|AMD/ATI)").unwrap();
