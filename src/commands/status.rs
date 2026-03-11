@@ -93,4 +93,63 @@ pub fn execute() {
     if !thermal_found {
         println!("Cooling Profile: Unknown / Firmware managed");
     }
+
+    // TDP Limit Status
+    let mut tdp_found = false;
+    
+    // Check Intel RAPL
+    let rapl_dir = Path::new("/sys/class/powercap/intel-rapl");
+    if rapl_dir.exists() {
+        if let Ok(entries) = fs::read_dir(rapl_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                
+                if name.starts_with("intel-rapl:") {
+                    let constraint_0 = path.join("constraint_0_power_limit_uw"); // PL1
+                    if constraint_0.exists() {
+                        if let Ok(limit_uw) = fs::read_to_string(&constraint_0) {
+                            if let Ok(limit) = limit_uw.trim().parse::<u64>() {
+                                println!("CPU TDP Limit: {}W (Intel RAPL PL1)", limit / 1_000_000);
+                                tdp_found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Check AMD HWMon
+    if !tdp_found {
+        let hwmon_dir = Path::new("/sys/class/hwmon");
+        if hwmon_dir.exists() {
+            if let Ok(entries) = fs::read_dir(hwmon_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let power1_cap = path.join("power1_cap");
+                    let name_path = path.join("name");
+                    
+                    if power1_cap.exists() {
+                        if let Ok(name) = fs::read_to_string(&name_path) {
+                            if name.trim().contains("amd") {
+                                if let Ok(limit_uw) = fs::read_to_string(&power1_cap) {
+                                    if let Ok(limit) = limit_uw.trim().parse::<u64>() {
+                                        println!("CPU TDP Limit: {}W (AMD hwmon)", limit / 1_000_000);
+                                        tdp_found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !tdp_found {
+        println!("CPU TDP Limit: Hardware Managed");
+    }
 }
