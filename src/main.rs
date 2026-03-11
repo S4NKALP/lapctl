@@ -31,5 +31,6 @@ fn main() {
         Commands::Power { command } => commands::power::execute(command),
         Commands::Cooling { command } => commands::cooling::execute(command),
         Commands::Status => commands::status::execute(),
+        Commands::InstallRules => commands::install_rules::execute(),
     }
 }

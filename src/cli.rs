@@ -39,6 +39,8 @@ pub enum Commands {
     },
     /// Hardware status
     Status,
+    /// Install udev rules for rootless operation
+    InstallRules,
 }
 
 #[derive(Subcommand, Debug)]
@@ -95,9 +97,7 @@ pub enum PowerCommands {
     /// Set power profile to battery saver
     BatterySave,
     /// Set CPU TDP limit (in Watts)
-    LimitTdp {
-        watts: u32,
-    },
+    LimitTdp { watts: u32 },
 }
 
 #[derive(Subcommand, Debug)]
@@ -113,9 +113,7 @@ pub enum CoolingCommands {
 #[derive(Subcommand, Debug)]
 pub enum BatteryCommands {
     /// Set the battery charging limit (e.g., 80)
-    Limit {
-        percent: u8,
-    },
+    Limit { percent: u8 },
     /// Show current battery status
     Status,
 }
