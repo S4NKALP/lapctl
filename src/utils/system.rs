@@ -69,7 +69,9 @@ pub fn rebuild_initramfs() {
         command = vec!["update-initramfs", "-u", "-k", "all"];
     } else if Path::new("/etc/redhat-release").exists() || Path::new("/usr/bin/zypper").exists() {
         command = vec!["dracut", "--force", "--regenerate-all"];
-    } else if Path::new("/usr/lib/endeavouros-release").exists() && Path::new("/usr/bin/dracut").exists() {
+    } else if Path::new("/usr/lib/endeavouros-release").exists()
+        && Path::new("/usr/bin/dracut").exists()
+    {
         command = vec!["dracut-rebuild"];
     } else if Path::new("/etc/altlinux-release").exists() {
         command = vec!["make-initrd"];
@@ -79,7 +81,13 @@ pub fn rebuild_initramfs() {
 
     if let Ok(which) = Command::new("which").arg("systemd-inhibit").output() {
         if which.status.success() {
-            let mut new_cmd = vec!["systemd-inhibit", "--who=lapctl", "--why", "Rebuilding initramfs", "--"];
+            let mut new_cmd = vec![
+                "systemd-inhibit",
+                "--who=lapctl",
+                "--why",
+                "Rebuilding initramfs",
+                "--",
+            ];
             new_cmd.extend(command.iter());
             command = new_cmd;
         }
@@ -88,7 +96,7 @@ pub fn rebuild_initramfs() {
     if !command.is_empty() {
         println!("Rebuilding the initramfs...");
         let is_debug = log::log_enabled!(log::Level::Debug);
-        
+
         let mut cmd = Command::new(command[0]);
         cmd.args(&command[1..]);
 
