@@ -1,11 +1,7 @@
 use clap::Parser;
 
-mod cli;
-mod commands;
-mod hardware;
-mod utils;
-
-use cli::{Cli, Commands};
+use lapctl::cli::{Cli, Commands};
+use lapctl::commands;
 
 fn main() {
     let cli = Cli::parse();
