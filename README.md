@@ -114,9 +114,15 @@ More contribution guidelines will be added once the project reaches its first st
 
 ---
 
+## Credits
+
+Special thanks to [EnvyControl](https://github.com/bayasdev/envycontrol) by bayasdev. `lapctl` drew heavily from EnvyControl's structural logic for seamlessly handling hardware configurations across Linux environments.
+
+---
+
 ## License
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+This project is licensed under the **MIT License**.
 
 You are free to use, modify, and distribute this software under the terms of the license.
 For full details, see the [LICENSE](LICENSE) file in this repository.
