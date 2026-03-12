@@ -28,5 +28,11 @@ fn main() {
         Commands::Cooling { command } => commands::cooling::execute(command),
         Commands::Status => commands::status::execute(),
         Commands::InstallRules => commands::install_rules::execute(),
+        Commands::Inhibit {
+            command,
+            why,
+            who,
+            daemon,
+        } => commands::inhibit::execute(command, why, who, *daemon),
     }
 }

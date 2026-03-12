@@ -41,6 +41,20 @@ pub enum Commands {
     Status,
     /// Install udev rules for rootless operation
     InstallRules,
+    /// Inhibit system sleep/suspend
+    Inhibit {
+        /// The command to run while inhibiting (optional)
+        command: Vec<String>,
+        /// Why the system is being inhibited
+        #[arg(long, default_value = "lapctl inhibiting sleep")]
+        why: String,
+        /// Who is inhibiting the system
+        #[arg(long, default_value = "lapctl")]
+        who: String,
+        /// Run the inhibitor in the background (daemon mode)
+        #[arg(long)]
+        daemon: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
