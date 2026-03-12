@@ -1,72 +1,58 @@
-# lapctl
+<div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)
 
-**lapctl** is a fast and easy command line tool made in Rust. It helps you control your Linux laptop hardware from the terminal.
+**Take full control of your Linux laptop hardware with a fast, zero dependency CLI tool built in Rust.**
 
-You can use it to change your graphics card mode, set battery charge limits, pick power profiles, and control the cooling fans. It talks directly to your system hardware, so it does not need any heavy background programs to run.
-
----
-
-## What It Can Do
-
-**Graphics Control**
-
-Easily switch between Integrated, Nvidia, and Hybrid graphics modes to save battery or get more power.
-
-**Battery Health**
-
-Set a battery charge limit like 80% to make your battery last longer over the years.
-
-**Power Saving**
-
-Change power profiles and set CPU power limits to save energy when you need it.
-
-**Cooling Control**
-
-Control the cooling fans for laptops like Lenovo or ASUS to keep your computer quiet or cool.
-
-**Sleep Inhibitor**
-
-Prevent your system from sleeping or suspending while running a task or indefinitely.
-
-**Hardware Status**
-
-Check the status of your battery, graphics, and power all in one place.
+</div>
 
 ---
 
-## How to Use It
+### Why lapctl?
+
+Modern Linux laptops often have great hardware that goes underutilized or requires heavy, bloated background services to manage. **lapctl** changes that.
+
+Built with performance and simplicity in mind, it talks directly to your system's hardware interfaces (`sysfs`, `acpi`, `udev`). No background daemons (unless you want them), no heavy RAM usage just pure control from your terminal.
+
+---
+
+### Key Features
+
+- **Graphics Switching**: Effortlessly toggle between Integrated, NVIDIA, and Hybrid modes. Optimize for battery life on the go or raw performance at your desk.
+- **Battery Health**: Modern batteries hate being at 100% all the time. Set custom charge limits (like 80%) to significantly extend your battery's lifespan.
+- **Power Tuning**: Switch through performance profiles or set hard CPU power (TDP) limits in Watts to keep things cool or let them loose.
+- **Intelligent Cooling**: Force your fans into Performance, Balanced, or Quiet modes (supporting ASUS and Lenovo laptops).
+- **Sleep Inhibitor**: Running a long compile or a critical download? Use the inhibitor to stop your laptop from falling asleep mid task.
+- **Instant Status**: Get a bird's eye view of your hardware state, battery health, and current limits with one simple command.
+
+---
+
+### Quick Start Guide
 
 ```bash
-# Graphics
-lapctl gpu integrated
-lapctl gpu hybrid
-lapctl gpu nvidia
+# Manage your GPU
+lapctl gpu integrated  # Max battery
+lapctl gpu hybrid      # Best of both worlds
+lapctl gpu nvidia      # High performance
 
-# Battery limit
+# Prolong battery life
 lapctl battery limit 80
 lapctl battery status
 
-# Power mode
+# Tune your power
 lapctl power performance
-lapctl power balanced
 lapctl power battery-save
+lapctl power limit-tdp 35  # Stay under 35W
 
-# Power limit in Watts
-lapctl power limit-tdp 35
-
-# Cooling fans
-lapctl cooling performance
-lapctl cooling balanced
+# Adjust your fans
 lapctl cooling quiet
+lapctl cooling performance
 
-# Sleep inhibitor
-lapctl inhibit
-lapctl inhibit --daemon
-lapctl inhibit -- why "Building project" cargo build
+# Keep it awake
+lapctl inhibit --daemon  # Run in background
+lapctl inhibit -- why "Critical update" ./long-task.sh
 
 # Check everything
 lapctl status
@@ -74,78 +60,41 @@ lapctl status
 
 ---
 
-## File Layout
+### Under the Hood
+
+The project is structured for speed and modularity:
 
 ```
 lapctl
 │
-├── Cargo.toml
-├── README.md
-├── LICENSE
-├── .gitignore
-│
 ├── src/
-│   ├── main.rs
-│   ├── cli.rs
-│   ├── lib.rs
-│   │
-│   ├── commands/
-│   │   ├── mod.rs
-│   │   ├── gpu.rs
-│   │   ├── battery.rs
-│   │   ├── power.rs
-│   │   ├── cooling.rs
-│   │   ├── inhibit.rs
-│   │   ├── install_rules.rs
-│   │   └── status.rs
-│   │
-│   ├── hardware/
-│   │   ├── mod.rs
-│   │   └── gpu.rs
-│   │
-│   └── utils/
-│       └── system.rs
+│   ├── main.rs         # The entry point
+│   ├── cli.rs          # Command definition & parsing
+│   ├── commands/       # Feature logic (GPU, Battery, etc.)
+│   ├── hardware/       # Hardware specific drivers (NVIDIA, etc.)
+│   └── utils/          # System helpers
 │
-└── tests/
-    ├── cli.rs
-    └── gpu.rs
+└── tests/              # Robust integration & unit tests
 ```
 
 ---
 
-## Project Goals Finished
+### Development & Connection
 
-- [x] CLI setup and routing
-- [x] Graphics switching (Wayland & Xorg)
-- [x] Battery limits tools
-- [x] System status checking
-- [x] Tool configuration saving
-- [x] Cooling fan setup
-- [x] CPU power limit setup
-- [x] Sleep inhibitor (systemd-inhibit wrapper)
+We love seeing how you use **lapctl**!
+
+- **Contribute**: Found a bug or have a feature idea? [Open an issue](https://github.com/S4NKALP/lapctl/issues) or submit a Pull Request. We're always looking for help supporting more laptop brands!
+- **Testing**: Please ensure all tests pass by running `cargo test` before submitting changes.
+- **Shoutout**: Huge thanks to [EnvyControl](https://github.com/bayasdev/envycontrol) for the inspiration on graphics management.
 
 ---
 
-## Contributions
+### License
 
-We welcome your ideas and help!
-To contribute, please fork the repository, create a new feature branch, and submit a Pull Request. Please ensure all tests pass by running `cargo test` before submitting your changes.
-
----
-
-## Special Credit
-
-Special thanks to [EnvyControl](https://github.com/bayasdev/envycontrol) by bayasdev. `lapctl` uses many ideas from EnvyControl to handle graphics setup on Linux.
+This project is licensed under the **MIT License**. You are free to use, modify, and distribute it as you see fit. See [LICENSE](LICENSE) for the full text.
 
 ---
 
-## License
-
-This project uses the **MIT License**.
-
-You can use, change, and share this software freely under the rules of the license.
-Check the [LICENSE](LICENSE) file in this folder for details.
-
----
-
-⭐ If you like this tool, please consider starring the repository!
+<div align="center">
+  <b>If you find lapctl useful, please consider starring the repository!</b>
+</div>
