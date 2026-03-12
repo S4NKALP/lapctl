@@ -28,6 +28,10 @@ Change power profiles and set CPU power limits to save energy when you need it.
 
 Control the cooling fans for laptops like Lenovo or ASUS to keep your computer quiet or cool.
 
+**Sleep Inhibitor**
+
+Prevent your system from sleeping or suspending while running a task or indefinitely.
+
 **Hardware Status**
 
 Check the status of your battery, graphics, and power all in one place.
@@ -59,6 +63,11 @@ lapctl cooling performance
 lapctl cooling balanced
 lapctl cooling quiet
 
+# Sleep inhibitor
+lapctl inhibit
+lapctl inhibit --daemon
+lapctl inhibit -- why "Building project" cargo build
+
 # Check everything
 lapctl status
 ```
@@ -86,6 +95,7 @@ lapctl
 │   │   ├── battery.rs
 │   │   ├── power.rs
 │   │   ├── cooling.rs
+│   │   ├── inhibit.rs
 │   │   ├── install_rules.rs
 │   │   └── status.rs
 │   │
@@ -112,6 +122,7 @@ lapctl
 - [x] Tool configuration saving
 - [x] Cooling fan setup
 - [x] CPU power limit setup
+- [x] Sleep inhibitor (systemd-inhibit wrapper)
 
 ---
 
