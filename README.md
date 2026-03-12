@@ -29,6 +29,27 @@ Built with performance and simplicity in mind, it talks directly to your system'
 
 ---
 
+### Installation
+
+**lapctl** is built with Rust. Ensure you have the [Rust toolchain](https://rustup.rs/) installed.
+
+#### Option 1: Using `just` (Recommended)
+If you have [just](https://github.com/casey/just) installed:
+```bash
+just install
+```
+
+#### Option 2: Using `cargo`
+```bash
+cargo install --path .
+```
+
+#### Requirements
+- **systemd**: For sleep inhibitor (`systemd-inhibit`)
+- **X11/NVIDIA Tools**: `xrandr`, `nvidia-settings` for GPU management
+
+---
+
 ### Quick Start Guide
 
 ```bash
