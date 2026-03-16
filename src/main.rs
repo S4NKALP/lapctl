@@ -28,6 +28,7 @@ fn main() {
         Commands::Cooling { command } => commands::cooling::execute(command),
         Commands::Status => commands::status::execute(),
         Commands::InstallRules => commands::install_rules::execute(),
+        Commands::Touchpad { command } => commands::touchpad::execute(command),
         Commands::Inhibit {
             command,
             why,

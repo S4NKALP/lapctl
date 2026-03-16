@@ -41,6 +41,11 @@ pub enum Commands {
     Status,
     /// Install udev rules for rootless operation
     InstallRules,
+    /// Touchpad management
+    Touchpad {
+        #[command(subcommand)]
+        command: TouchpadCommands,
+    },
     /// Inhibit system sleep/suspend
     Inhibit {
         /// The command to run while inhibiting (optional)
@@ -130,4 +135,12 @@ pub enum BatteryCommands {
     Limit { percent: u8 },
     /// Show current battery status
     Status,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum TouchpadCommands {
+    /// Enable the touchpad
+    Enable,
+    /// Disable the touchpad
+    Disable,
 }
