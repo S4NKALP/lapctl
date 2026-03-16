@@ -24,6 +24,7 @@ Built with performance and simplicity in mind, it talks directly to your system'
 - **Battery Health**: Modern batteries hate being at 100% all the time. Set custom charge limits (like 80%) to significantly extend your battery's lifespan.
 - **Power Tuning**: Switch through performance profiles or set hard CPU power (TDP) limits in Watts to keep things cool or let them loose.
 - **Intelligent Cooling**: Force your fans into Performance, Balanced, or Quiet modes (supporting ASUS and Lenovo laptops).
+- **Touchpad Toggle**: Quickly enable or disable your touchpad from the terminal when using an external mouse.
 - **Sleep Inhibitor**: Running a long compile or a critical download? Use the inhibitor to stop your laptop from falling asleep mid task.
 - **Instant Status**: Get a bird's eye view of your hardware state, battery health, and current limits with one simple command.
 
@@ -70,6 +71,10 @@ lapctl power limit-tdp 35  # Stay under 35W
 # Adjust your fans
 lapctl cooling quiet
 lapctl cooling performance
+
+# Manage your touchpad
+lapctl touchpad disable
+lapctl touchpad enable
 
 # Keep it awake
 lapctl inhibit --daemon  # Run in background
