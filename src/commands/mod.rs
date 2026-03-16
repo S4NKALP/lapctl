@@ -5,3 +5,4 @@ pub mod inhibit;
 pub mod install_rules;
 pub mod power;
 pub mod status;
+pub mod touchpad;

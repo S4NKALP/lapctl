@@ -27,6 +27,9 @@ ACTION=="add", SUBSYSTEM=="powercap", RUN+="/bin/sh -c 'chmod a+w /sys/class/pow
 
 # AMD HWMon Power Capping
 ACTION=="add", SUBSYSTEM=="hwmon", RUN+="/bin/sh -c 'find /sys/class/hwmon -name \"power1_cap\" -exec chmod a+w {} + 2>/dev/null'"
+
+# Input Device Inhibition (Touchpad)
+ACTION=="add", SUBSYSTEM=="input", RUN+="/bin/sh -c 'find /sys/class/input -name \"inhibited\" -exec chmod a+w {} + 2>/dev/null'"
 "#;
 
 pub fn execute() {
@@ -58,6 +61,7 @@ pub fn execute() {
         "chmod a+w /sys/devices/platform/asus-nb-wmi/throttle_thermal_policy 2>/dev/null",
         "chmod a+w /sys/class/powercap/intel-rapl:0/constraint_*_power_limit_uw 2>/dev/null",
         "find /sys/class/hwmon -name \"power1_cap\" -exec chmod a+w {} + 2>/dev/null",
+        "find /sys/class/input -name \"inhibited\" -exec chmod a+w {} + 2>/dev/null",
     ];
 
     for cmd in commands {

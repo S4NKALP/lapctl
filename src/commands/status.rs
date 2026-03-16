@@ -153,4 +153,30 @@ pub fn execute() {
     if !tdp_found {
         println!("CPU TDP Limit: Hardware Managed");
     }
+
+    // Touchpad Status
+    let sys_class_input = Path::new("/sys/class/input");
+    if sys_class_input.exists()
+        && let Ok(entries) = fs::read_dir(sys_class_input)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name_path = path.join("name");
+            let inhibited_path = path.join("inhibited");
+
+            if name_path.exists()
+                && inhibited_path.exists()
+                && let Ok(name) = fs::read_to_string(&name_path)
+                && name.to_lowercase().contains("touchpad")
+                && let Ok(val) = fs::read_to_string(&inhibited_path)
+            {
+                let status = if val.trim() == "1" {
+                    "Disabled"
+                } else {
+                    "Enabled"
+                };
+                println!("Touchpad: {} ({})", status, name.trim());
+            }
+        }
+    }
 }
