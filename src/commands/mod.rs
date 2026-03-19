@@ -1,5 +1,6 @@
 pub mod battery;
 pub mod cooling;
+pub mod display;
 pub mod gpu;
 pub mod inhibit;
 pub mod install_rules;
