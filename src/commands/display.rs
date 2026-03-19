@@ -269,6 +269,30 @@ fn fetch_state() -> Option<(Connection, AppState, wayland_client::EventQueue<App
     Some((conn, state, event_queue))
 }
 
+pub fn get_active_display_info() -> Vec<String> {
+    let mut infos = Vec::new();
+    if let Some((_, state, _)) = fetch_state() {
+        for (_, head) in state.heads.iter() {
+            if !head.enabled {
+                continue;
+            }
+            let Some(current_mode_handle) = &head.current_mode else {
+                continue;
+            };
+            let Some((_, mode)) = state.modes.get(current_mode_handle) else {
+                continue;
+            };
+
+            let hz = (mode.refresh as f64) / 1000.0;
+            infos.push(format!(
+                "{} ({}): {}x{} px, {:.3} Hz",
+                head.name, head.make, mode.width, mode.height, hz
+            ));
+        }
+    }
+    infos
+}
+
 fn show_refresh_rates() {
     if let Some((_, state, _)) = fetch_state() {
         for (head_handle, head) in state.heads.iter() {
