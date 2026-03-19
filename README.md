@@ -48,7 +48,7 @@ cargo install --path .
 
 #### Requirements
 - **systemd**: For sleep inhibitor (`systemd-inhibit`)
-- **X11/NVIDIA Tools**: `xrandr`, `nvidia-settings` for GPU management
+- **GPU Switching (Optional)**: `xrandr` and `nvidia-settings` are strictly required **ONLY** when using the `lapctl gpu` command on X11 (to route proprietary NVIDIA Optimus drivers).
 - **Wayland Display**: Built entirely natively using `wayland-client` and `wayland-protocols-wlr` (no `wlr-randr` required!)
 
 #### Limitations
