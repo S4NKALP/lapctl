@@ -37,6 +37,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: CoolingCommands,
     },
+    /// Display management commands
+    Display {
+        #[command(subcommand)]
+        command: DisplayCommands,
+    },
     /// Hardware status
     Status,
     /// Install udev rules for rootless operation
@@ -143,4 +148,15 @@ pub enum TouchpadCommands {
     Enable,
     /// Disable the touchpad
     Disable,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DisplayCommands {
+    /// Show available and active refresh rates
+    Rates,
+    /// Set the display refresh rate
+    SetRate {
+        /// Target refresh rate in Hz
+        rate: f32,
+    },
 }

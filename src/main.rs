@@ -26,6 +26,7 @@ fn main() {
         Commands::Battery { command } => commands::battery::execute(command),
         Commands::Power { command } => commands::power::execute(command),
         Commands::Cooling { command } => commands::cooling::execute(command),
+        Commands::Display { command } => commands::display::execute(command),
         Commands::Status => commands::status::execute(),
         Commands::InstallRules => commands::install_rules::execute(),
         Commands::Touchpad { command } => commands::touchpad::execute(command),
