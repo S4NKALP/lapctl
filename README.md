@@ -63,6 +63,7 @@ cargo install --path .
 lapctl gpu integrated  # Max battery
 lapctl gpu hybrid      # Best of both worlds
 lapctl gpu nvidia      # High performance
+lapctl gpu run steam # Run 'steam' on dGPU directly while in Hybrid mode
 
 # Prolong battery life
 lapctl battery limit 80
