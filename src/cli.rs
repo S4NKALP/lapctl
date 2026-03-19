@@ -110,6 +110,12 @@ pub enum GpuCommands {
     CacheDelete,
     /// Show cache created by lapctl
     CacheQuery,
+    /// Run an application on the discrete GPU (Requires Hybrid Mode)
+    Run {
+        /// The command and arguments to execute
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
