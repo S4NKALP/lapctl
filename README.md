@@ -35,23 +35,38 @@ Built with performance and simplicity in mind, it talks directly to your system'
 
 **lapctl** is built with Rust. Ensure you have the [Rust toolchain](https://rustup.rs/) installed.
 
-#### Option 1: Using `just` (Recommended)
-If you have [just](https://github.com/casey/just) installed:
+#### Option 1: Arch Linux (AUR)
+
+If you are on Arch Linux, you can install **lapctl-git** from the AUR. This is the recommended method for Arch users as it automatically handles dependencies and udev rules.
+
 ```bash
-just install
+yay -S lapctl-git
 ```
 
-#### Option 2: Using `cargo`
+#### Option 2: Using `just` (Recommended for other distros)
+
+If you have [just](https://github.com/casey/just) installed:
+
+```bash
+just install
+sudo lapctl install-rules
+```
+
+#### Option 3: Using `cargo`
+
 ```bash
 cargo install --path .
+sudo lapctl install-rules
 ```
 
 #### Requirements
+
 - **systemd**: For sleep inhibitor (`systemd-inhibit`)
 - **GPU Switching (Optional)**: `xrandr` and `nvidia-settings` are strictly required **ONLY** when using the `lapctl gpu` command on X11 (to route proprietary NVIDIA Optimus drivers).
 - **Wayland Display**: Built entirely natively using `wayland-client` and `wayland-protocols-wlr` (no `wlr-randr` required!)
 
 #### Limitations
+
 - **GNOME / KDE Plasma (Wayland)**: The display refresh rate feature relies heavily on the `zwlr_output_manager_v1` protocol. This protocol is exclusive to wlroots-based compositors (like Sway and Hyprland). GNOME and KDE use their own disparate internal display protocols, meaning this feature will **not work** out-of-the-box on those Desktop Environments.
 
 ---
@@ -59,6 +74,9 @@ cargo install --path .
 ### Quick Start Guide
 
 ```bash
+# Install udev rules (Required for rootless control if not using AUR)
+sudo lapctl install-rules
+
 # Manage your GPU
 lapctl gpu integrated  # Max battery
 lapctl gpu hybrid      # Best of both worlds
