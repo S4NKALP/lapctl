@@ -24,6 +24,7 @@ Built with performance and simplicity in mind, it talks directly to your system'
 - **Battery Health**: Modern batteries hate being at 100% all the time. Set custom charge limits (like 80%) to significantly extend your battery's lifespan.
 - **Power Tuning**: Switch through performance profiles or set hard CPU power (TDP) limits in Watts to keep things cool or let them loose.
 - **Intelligent Cooling**: Force your fans into Performance, Balanced, or Quiet modes (supporting ASUS and Lenovo laptops).
+- **Display Refresh Rate**: Easily query available refresh rates and change your active display's Hz on-the-fly (100% native Rust Wayland implementation using `zwlr_output_manager_v1` for wlroots compositors like Sway and Hyprland).
 - **Touchpad Toggle**: Quickly enable or disable your touchpad from the terminal when using an external mouse.
 - **Sleep Inhibitor**: Running a long compile or a critical download? Use the inhibitor to stop your laptop from falling asleep mid task.
 - **Instant Status**: Get a bird's eye view of your hardware state, battery health, and current limits with one simple command.
@@ -47,7 +48,11 @@ cargo install --path .
 
 #### Requirements
 - **systemd**: For sleep inhibitor (`systemd-inhibit`)
-- **X11/NVIDIA Tools**: `xrandr`, `nvidia-settings` for GPU management
+- **GPU Switching (Optional)**: `xrandr` and `nvidia-settings` are strictly required **ONLY** when using the `lapctl gpu` command on X11 (to route proprietary NVIDIA Optimus drivers).
+- **Wayland Display**: Built entirely natively using `wayland-client` and `wayland-protocols-wlr` (no `wlr-randr` required!)
+
+#### Limitations
+- **GNOME / KDE Plasma (Wayland)**: The display refresh rate feature relies heavily on the `zwlr_output_manager_v1` protocol. This protocol is exclusive to wlroots-based compositors (like Sway and Hyprland). GNOME and KDE use their own disparate internal display protocols, meaning this feature will **not work** out-of-the-box on those Desktop Environments.
 
 ---
 
@@ -58,6 +63,7 @@ cargo install --path .
 lapctl gpu integrated  # Max battery
 lapctl gpu hybrid      # Best of both worlds
 lapctl gpu nvidia      # High performance
+lapctl gpu run steam   # Run 'steam' on dGPU directly while in Hybrid mode
 
 # Prolong battery life
 lapctl battery limit 80
@@ -75,6 +81,10 @@ lapctl cooling performance
 # Manage your touchpad
 lapctl touchpad disable
 lapctl touchpad enable
+
+# Manage your display refresh rate
+lapctl display rates
+lapctl display set-rate 144
 
 # Keep it awake
 lapctl inhibit --daemon  # Run in background

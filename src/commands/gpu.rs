@@ -485,6 +485,43 @@ fn switch_nvidia(
     println!("Please reboot your computer for changes to take effect!");
 }
 
+fn run_on_dgpu(command: &[String]) {
+    if command.is_empty() {
+        error!("No command provided to run.");
+        return;
+    }
+
+    if get_current_mode() != "hybrid" {
+        log::warn!(
+            "Running on dGPU is typically only effective in Hybrid mode. \
+             Your current mode is '{}'. The application may fail to start or \
+             not use the NVIDIA GPU.",
+            get_current_mode()
+        );
+    }
+
+    log::info!("Launching '{}' on the discrete GPU...", command.join(" "));
+
+    let mut child = Command::new(&command[0]);
+    if command.len() > 1 {
+        child.args(&command[1..]);
+    }
+
+    // Set PRIME offload variables natively
+    child.env("__NV_PRIME_RENDER_OFFLOAD", "1");
+    child.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
+    child.env("__VK_LAYER_NV_optimus", "NVIDIA_only");
+
+    match child.status() {
+        Ok(status) => {
+            log::info!("Application exited with: {}", status);
+        }
+        Err(e) => {
+            error!("Failed to launch application: {}", e);
+        }
+    }
+}
+
 pub fn execute(cmd: &GpuCommands) {
     match cmd {
         GpuCommands::Query => {
@@ -551,5 +588,6 @@ pub fn execute(cmd: &GpuCommands) {
             *use_nvidia_current,
             *wayland,
         ),
+        GpuCommands::Run { command } => run_on_dgpu(command),
     }
 }

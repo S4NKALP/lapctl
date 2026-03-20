@@ -1,3 +1,4 @@
+use crate::commands::display;
 use crate::hardware::gpu;
 use std::fs;
 use std::path::Path;
@@ -177,6 +178,16 @@ pub fn execute() {
                 };
                 println!("Touchpad: {} ({})", status, name.trim());
             }
+        }
+    }
+
+    // Display Status
+    let displays = display::get_active_display_info();
+    if displays.is_empty() {
+        println!("Display: Unknown / Firmware managed");
+    } else {
+        for d in displays {
+            println!("Display: {}", d);
         }
     }
 }
