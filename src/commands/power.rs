@@ -2,6 +2,52 @@ use crate::cli::PowerCommands;
 use log::{error, info};
 use std::fs;
 use std::path::Path;
+use zbus::Connection;
+use zbus::proxy;
+
+#[proxy(
+    interface = "org.lapctl1",
+    default_service = "org.lapctl",
+    default_path = "/org/lapctl"
+)]
+trait Lapctl {
+    async fn set_power_profile(&self, profile: String) -> zbus::Result<()>;
+    async fn set_tdp_limit(&self, watts: u32) -> zbus::Result<()>;
+}
+
+fn try_call_daemon(command: &PowerCommands) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+
+    rt.block_on(async {
+        let connection = match Connection::system().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        let proxy = match LapctlProxy::new(&connection).await {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        match command {
+            PowerCommands::Performance => proxy
+                .set_power_profile("performance".to_string())
+                .await
+                .is_ok(),
+            PowerCommands::Balanced => proxy
+                .set_power_profile("balanced".to_string())
+                .await
+                .is_ok(),
+            PowerCommands::BatterySave => proxy
+                .set_power_profile("battery-save".to_string())
+                .await
+                .is_ok(),
+            PowerCommands::LimitTdp { watts } => proxy.set_tdp_limit(*watts).await.is_ok(),
+        }
+    })
+}
 
 fn set_cpu_governor(governor: &str) {
     let cpu_dir = Path::new("/sys/devices/system/cpu");
@@ -155,6 +201,11 @@ fn set_platform_profile(profile: &str) {
 }
 
 pub fn execute(command: &PowerCommands) {
+    if try_call_daemon(command) {
+        println!("Request handled by lapctld daemon.");
+        return;
+    }
+
     match command {
         PowerCommands::Performance => {
             println!("Setting power profile to Performance");

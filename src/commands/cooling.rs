@@ -2,6 +2,47 @@ use crate::cli::CoolingCommands;
 use log::{debug, info};
 use std::fs;
 use std::path::Path;
+use zbus::Connection;
+use zbus::proxy;
+
+#[proxy(
+    interface = "org.lapctl1",
+    default_service = "org.lapctl",
+    default_path = "/org/lapctl"
+)]
+trait Lapctl {
+    async fn set_cooling_profile(&self, profile: String) -> zbus::Result<()>;
+}
+
+fn try_call_daemon(command: &CoolingCommands) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+
+    rt.block_on(async {
+        let connection = match Connection::system().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        let proxy = match LapctlProxy::new(&connection).await {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        match command {
+            CoolingCommands::Performance => proxy
+                .set_cooling_profile("performance".to_string())
+                .await
+                .is_ok(),
+            CoolingCommands::Balanced => proxy
+                .set_cooling_profile("balanced".to_string())
+                .await
+                .is_ok(),
+            CoolingCommands::Quiet => proxy.set_cooling_profile("quiet".to_string()).await.is_ok(),
+        }
+    })
+}
 
 fn set_ideapad_fan_mode(mode: &str) -> bool {
     let mut success = false;
@@ -38,6 +79,11 @@ fn set_asus_throttle_policy(mode: &str) -> bool {
 }
 
 pub fn execute(command: &CoolingCommands) {
+    if try_call_daemon(command) {
+        println!("Request handled by lapctld daemon.");
+        return;
+    }
+
     let (ideapad_mode, asus_mode, desc) = match command {
         CoolingCommands::Performance => ("1", "1", "Performance"),
         CoolingCommands::Balanced => ("0", "0", "Balanced"),

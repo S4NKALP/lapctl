@@ -54,6 +54,71 @@ pub fn get_nvidia_gpu_pci_bus() -> String {
     std::process::exit(1);
 }
 
+pub fn get_nvidia_gpu_pci_addr() -> Option<String> {
+    let output = Command::new("lspci")
+        .output()
+        .expect("Failed to execute lspci");
+    let lspci_output = String::from_utf8_lossy(&output.stdout);
+
+    for line in lspci_output.lines() {
+        if line.contains("NVIDIA")
+            && (line.contains("VGA compatible controller") || line.contains("3D controller"))
+        {
+            let pci_addr = line.split_whitespace().next().unwrap();
+            if pci_addr.contains(':') {
+                if pci_addr.chars().filter(|&c| c == ':').count() == 1 {
+                    return Some(format!("0000:{}", pci_addr));
+                }
+                return Some(pci_addr.to_string());
+            }
+        }
+    }
+    None
+}
+
+pub fn unbind_gpu(pci_addr: &str) -> Result<(), String> {
+    let driver_path = Path::new("/sys/bus/pci/devices")
+        .join(pci_addr)
+        .join("driver");
+    if driver_path.exists() {
+        let unbind_path = driver_path.join("unbind");
+        info!("Unbinding GPU at {} via {:?}", pci_addr, unbind_path);
+        std::fs::write(unbind_path, pci_addr).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn remove_gpu(pci_addr: &str) -> Result<(), String> {
+    let remove_path = Path::new("/sys/bus/pci/devices")
+        .join(pci_addr)
+        .join("remove");
+    if remove_path.exists() {
+        info!("Removing GPU at {} via {:?}", pci_addr, remove_path);
+        std::fs::write(remove_path, "1").map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn rescan_pci() -> Result<(), String> {
+    let rescan_path = Path::new("/sys/bus/pci/rescan");
+    info!("Rescanning PCI bus via {:?}", rescan_path);
+    std::fs::write(rescan_path, "1").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn kill_gpu_processes() -> Result<(), String> {
+    info!("Killing processes using NVIDIA GPU...");
+    // Try using fuser first as it is more likely to be available and easy to use
+    let _ = Command::new("fuser").args(["-k", "/dev/nvidia*"]).output();
+
+    // Also kill specific nvidia services if they are running
+    let _ = Command::new("systemctl")
+        .args(["stop", "nvidia-persistenced.service"])
+        .output();
+
+    Ok(())
+}
+
 pub fn get_igpu_vendor() -> Option<String> {
     let output = Command::new("lspci").output().ok()?;
     let lspci_output = String::from_utf8_lossy(&output.stdout);

@@ -9,8 +9,25 @@ pub fn assert_root() {
     if let Ok(output) = output {
         let is_root = String::from_utf8_lossy(&output.stdout).trim() == "0";
         if !is_root {
-            error!("This operation requires root privileges");
-            std::process::exit(1);
+            // Try to re-exec with pkexec
+            if let Ok(exe) = std::env::current_exe() {
+                let args: Vec<String> = std::env::args().skip(1).collect();
+                info!("Not running as root. Attempting to elevate privileges via pkexec...");
+                let status = Command::new("pkexec").arg(exe).args(&args).status();
+
+                match status {
+                    Ok(s) if s.success() => std::process::exit(0),
+                    _ => {
+                        error!("Privilege escalation failed or was cancelled.");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                error!(
+                    "This operation requires root privileges and could not determine executable path."
+                );
+                std::process::exit(1);
+            }
         }
     }
 }
@@ -43,17 +60,72 @@ pub fn create_file(path: &str, content: &str, executable: bool) {
 }
 
 pub fn get_display_manager() -> Option<String> {
-    if let Ok(content) = fs::read_to_string("/etc/systemd/system/display-manager.service") {
-        let re = regex::Regex::new(r"ExecStart=(.+)\n").unwrap();
-        if let Some(cap) = re.captures(&content) {
-            let path = cap.get(1).unwrap().as_str();
-            let dm = Path::new(path).file_name()?.to_string_lossy().to_string();
-            info!("Found {} Display Manager", dm);
-            return Some(dm);
-        }
+    let output = Command::new("systemctl")
+        .args(["show", "-p", "FragmentPath", "display-manager.service"])
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if let Some(line) = stdout.lines().next()
+        && let Some(path_str) = line.strip_prefix("FragmentPath=")
+        && !path_str.is_empty()
+        && path_str != "/dev/null"
+    {
+        let dm = Path::new(path_str)
+            .file_name()?
+            .to_string_lossy()
+            .to_string();
+        info!("Found {} Display Manager", dm);
+        return Some(dm);
     }
     warn!("Display Manager detection is not available");
     None
+}
+
+pub fn is_service_active(name: &str) -> bool {
+    let output = Command::new("systemctl").args(["is-active", name]).output();
+    if let Ok(output) = output {
+        return String::from_utf8_lossy(&output.stdout).trim() == "active";
+    }
+    false
+}
+
+pub fn get_active_graphical_sessions() -> Vec<String> {
+    let mut sessions = Vec::new();
+    let output = Command::new("loginctl")
+        .args(["list-sessions", "--no-legend"])
+        .output();
+
+    if let Ok(output) = output {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(id) = parts.first() {
+                let show_output = Command::new("loginctl")
+                    .args(["show-session", id, "-p", "Type", "-p", "State"])
+                    .output();
+                if let Ok(show_output) = show_output {
+                    let show_stdout = String::from_utf8_lossy(&show_output.stdout);
+                    let mut is_graphical = false;
+                    let mut is_active = false;
+                    for show_line in show_stdout.lines() {
+                        if let Some(t) = show_line.strip_prefix("Type=") {
+                            if t == "x11" || t == "wayland" {
+                                is_graphical = true;
+                            }
+                        } else if let Some(s) = show_line.strip_prefix("State=")
+                            && (s == "active" || s == "online")
+                        {
+                            is_active = true;
+                        }
+                    }
+                    if is_graphical && is_active {
+                        sessions.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+    sessions
 }
 
 pub fn rebuild_initramfs() {
@@ -110,5 +182,25 @@ pub fn rebuild_initramfs() {
                 error!("An error occurred while rebuilding the initramfs");
             }
         }
+    }
+}
+
+pub fn manage_service(name: &str, action: &str) -> Result<(), String> {
+    info!("Performing {} on service {}", action, name);
+    let mut cmd = Command::new("systemctl");
+    cmd.args([action, name]);
+    match cmd.status() {
+        Ok(s) if s.success() => Ok(()),
+        _ => Err(format!("Failed to {} service {}", action, name)),
+    }
+}
+
+pub fn terminate_session(id: &str) -> Result<(), String> {
+    info!("Terminating session {}", id);
+    let mut cmd = Command::new("loginctl");
+    cmd.args(["terminate-session", id]);
+    match cmd.status() {
+        Ok(s) if s.success() => Ok(()),
+        _ => Err(format!("Failed to terminate session {}", id)),
     }
 }

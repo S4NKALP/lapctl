@@ -35,6 +35,16 @@ fn main() {
             why,
             who,
             daemon,
-        } => commands::inhibit::execute(command, why, who, *daemon),
+            stop,
+        } => commands::inhibit::execute(command, why, who, *daemon, *stop),
+        Commands::Daemon => {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                if let Err(e) = lapctl::daemon::run().await {
+                    eprintln!("Daemon error: {}", e);
+                    std::process::exit(1);
+                }
+            });
+        }
     }
 }

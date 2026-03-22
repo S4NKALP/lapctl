@@ -1,7 +1,63 @@
 use log::{error, info};
 use std::process::Command;
+use zbus::Connection;
+use zbus::proxy;
 
-pub fn execute(command_args: &[String], why: &str, who: &str, daemon: bool) {
+#[proxy(
+    interface = "org.lapctl1",
+    default_service = "org.lapctl",
+    default_path = "/org/lapctl"
+)]
+trait Lapctl {
+    async fn set_system_inhibition(
+        &self,
+        active: bool,
+        why: String,
+        who: String,
+    ) -> zbus::Result<()>;
+}
+
+fn try_call_daemon_inhibit(active: bool, why: String, who: String) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+
+    rt.block_on(async {
+        let connection = match Connection::system().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        let proxy = match LapctlProxy::new(&connection).await {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        proxy.set_system_inhibition(active, why, who).await.is_ok()
+    })
+}
+
+pub fn execute(command_args: &[String], why: &str, who: &str, daemon: bool, stop: bool) {
+    if stop {
+        if try_call_daemon_inhibit(false, why.to_string(), who.to_string()) {
+            println!("Persistent system inhibition deactivated via lapctld.");
+        } else {
+            error!("Failed to deactivate inhibition via daemon. Is lapctld running?");
+        }
+        return;
+    }
+
+    if daemon && command_args.is_empty() {
+        if try_call_daemon_inhibit(true, why.to_string(), who.to_string()) {
+            println!("Persistent system inhibition activated via lapctld.");
+            println!("The system will stay awake until you run: lapctl inhibit --stop");
+            return;
+        } else {
+            error!("Failed to activate inhibition via daemon. Is lapctld running?");
+            // Fallback to local systemd-inhibit if daemon call fails
+        }
+    }
+
     let args = build_args(command_args, why, who);
 
     if command_args.is_empty() {

@@ -12,9 +12,7 @@
 
 ### Why lapctl?
 
-Modern Linux laptops often have great hardware that goes underutilized or requires heavy, bloated background services to manage. **lapctl** changes that.
-
-Built with performance and simplicity in mind, it talks directly to your system's hardware interfaces (`sysfs`, `acpi`, `udev`). No background daemons (unless you want them), no heavy RAM usage just pure control from your terminal.
+Built with performance and simplicity in mind, it talks directly to your system's hardware interfaces (`sysfs`, `acpi`, `udev`). A high-performance background daemon (**lapctld**) handles all privileged operations via a secure D-Bus interface, allowing you to control your laptop completely **without sudo**.
 
 ---
 
@@ -52,6 +50,8 @@ just install
 sudo lapctl install-rules
 ```
 
+*The `install-rules` command automatically sets up the D-Bus policy and starts the `lapctld` background service.*
+
 #### Option 3: Using `cargo`
 
 ```bash
@@ -74,8 +74,10 @@ sudo lapctl install-rules
 ### Quick Start Guide
 
 ```bash
-# Install udev rules (Required for rootless control if not using AUR)
+# Install D-Bus policy & start daemon (Required for rootless control)
 sudo lapctl install-rules
+
+# From now on, NO sudo is required!
 
 # Manage your GPU
 lapctl gpu integrated  # Max battery
@@ -104,9 +106,10 @@ lapctl touchpad enable
 lapctl display rates
 lapctl display set-rate 144
 
-# Keep it awake
-lapctl inhibit --daemon  # Run in background
-lapctl inhibit -- why "Critical update" ./long-task.sh
+# Keep it awake (requires lapctld)
+lapctl inhibit --daemon  # Stay awake persistently (via daemon)
+lapctl inhibit --stop    # Allow sleep again
+lapctl inhibit --why "Keeping awake" -- sleep 60 # One-shot (local)
 
 # Check everything
 lapctl status
@@ -124,7 +127,8 @@ lapctl
 ├── src/
 │   ├── main.rs         # The entry point
 │   ├── cli.rs          # Command definition & parsing
-│   ├── commands/       # Feature logic (GPU, Battery, etc.)
+│   ├── daemon/         # lapctld (D-Bus interface & logic)
+│   ├── commands/       # CLI feature logic & proxies
 │   ├── hardware/       # Hardware specific drivers (NVIDIA, etc.)
 │   └── utils/          # System helpers
 │
