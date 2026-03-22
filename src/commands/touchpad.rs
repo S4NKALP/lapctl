@@ -2,8 +2,47 @@ use crate::cli::TouchpadCommands;
 use log::{error, info};
 use std::fs;
 use std::path::Path;
+use zbus::Connection;
+use zbus::proxy;
+
+#[proxy(
+    interface = "org.lapctl1",
+    default_service = "org.lapctl",
+    default_path = "/org/lapctl"
+)]
+trait Lapctl {
+    async fn set_touchpad_inhibition(&self, inhibited: bool) -> zbus::Result<()>;
+}
+
+fn try_call_daemon(command: &TouchpadCommands) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+
+    rt.block_on(async {
+        let connection = match Connection::system().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        let proxy = match LapctlProxy::new(&connection).await {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        match command {
+            TouchpadCommands::Enable => proxy.set_touchpad_inhibition(false).await.is_ok(),
+            TouchpadCommands::Disable => proxy.set_touchpad_inhibition(true).await.is_ok(),
+        }
+    })
+}
 
 pub fn execute(command: &TouchpadCommands) {
+    if try_call_daemon(command) {
+        println!("Request handled by lapctld daemon.");
+        return;
+    }
+
     let sys_class_input = Path::new("/sys/class/input");
     if !sys_class_input.exists() {
         error!("Could not find /sys/class/input. Is this a Linux system?");

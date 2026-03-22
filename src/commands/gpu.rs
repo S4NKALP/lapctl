@@ -1,13 +1,101 @@
 use crate::cli::GpuCommands;
 use crate::hardware::gpu::{
-    get_amd_igpu_name, get_current_mode, get_igpu_vendor, get_nvidia_gpu_pci_bus,
+    get_amd_igpu_name, get_current_mode, get_igpu_vendor, get_nvidia_gpu_pci_addr,
+    get_nvidia_gpu_pci_bus, kill_gpu_processes, remove_gpu, rescan_pci, unbind_gpu,
 };
-use crate::utils::system::{assert_root, create_file, get_display_manager, rebuild_initramfs};
+use crate::utils::system::{
+    assert_root, create_file, get_active_graphical_sessions, get_display_manager,
+    is_service_active, manage_service, rebuild_initramfs, terminate_session,
+};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use zbus::Connection;
+use zbus::proxy;
+
+#[proxy(
+    interface = "org.lapctl1",
+    default_service = "org.lapctl",
+    default_path = "/org/lapctl"
+)]
+trait Lapctl {
+    async fn switch_gpu_integrated(&self, no_reboot: bool) -> zbus::Result<()>;
+    async fn switch_gpu_hybrid(
+        &self,
+        rtd3: i32,
+        use_nvidia_current: bool,
+        no_reboot: bool,
+    ) -> zbus::Result<()>;
+    async fn switch_gpu_nvidia(
+        &self,
+        dm: String,
+        force_comp: bool,
+        coolbits: i32,
+        use_nvidia_current: bool,
+        wayland: bool,
+        no_reboot: bool,
+    ) -> zbus::Result<()>;
+}
+
+fn try_call_daemon(cmd: &GpuCommands) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+
+    rt.block_on(async {
+        let connection = match Connection::system().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        let proxy = match LapctlProxy::new(&connection).await {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        match cmd {
+            GpuCommands::Integrated { no_reboot } => {
+                proxy.switch_gpu_integrated(*no_reboot).await.is_ok()
+            }
+            GpuCommands::Hybrid {
+                rtd3,
+                use_nvidia_current,
+                no_reboot,
+            } => {
+                let rtd3_val = rtd3.map(|v| v as i32).unwrap_or(-1);
+                proxy
+                    .switch_gpu_hybrid(rtd3_val, *use_nvidia_current, *no_reboot)
+                    .await
+                    .is_ok()
+            }
+            GpuCommands::Nvidia {
+                dm,
+                force_comp,
+                coolbits,
+                use_nvidia_current,
+                wayland,
+                no_reboot,
+            } => {
+                let dm_val = dm.clone().unwrap_or_default();
+                let coolbits_val = coolbits.map(|v| v as i32).unwrap_or(-1);
+                proxy
+                    .switch_gpu_nvidia(
+                        dm_val,
+                        *force_comp,
+                        coolbits_val,
+                        *use_nvidia_current,
+                        *wayland,
+                        *no_reboot,
+                    )
+                    .await
+                    .is_ok()
+            }
+            _ => false,
+        }
+    })
+}
 
 const CACHE_FILE_PATH: &str = "/var/cache/lapctl/cache.json";
 const BLACKLIST_PATH: &str = "/etc/modprobe.d/blacklist-nvidia.conf";
@@ -258,10 +346,12 @@ fn create_cache_obj(bus_id: String) -> Cache {
 }
 
 fn create_cache_file() {
-    if get_current_mode() != "hybrid" {
-        error!("--cache-create requires that the system be in the hybrid Optimus mode");
+    let pci_addr = get_nvidia_gpu_pci_addr();
+    if pci_addr.is_none() {
+        log::debug!("NVIDIA GPU not found, skipping cache creation");
         return;
     }
+
     let bus_id = get_nvidia_gpu_pci_bus();
     let cache = create_cache_obj(bus_id);
 
@@ -272,7 +362,7 @@ fn create_cache_file() {
     if let Ok(json) = serde_json::to_string_pretty(&cache)
         && fs::write(CACHE_FILE_PATH, json).is_ok()
     {
-        log::debug!("Created file {}", CACHE_FILE_PATH);
+        log::debug!("Created/Updated cache file {}", CACHE_FILE_PATH);
     }
 }
 
@@ -290,9 +380,83 @@ fn read_cache_file() -> Result<Cache, String> {
     }
 }
 
-fn switch_integrated() {
+fn prepare_no_reboot(dm_flag: Option<String>) -> Result<Option<String>, String> {
+    let dm_name = dm_flag.or_else(get_display_manager);
+
+    if let Some(ref name) = dm_name
+        && is_service_active(name)
+    {
+        info!("Stopping display manager: {}", name);
+        manage_service(name, "stop")?;
+        return Ok(Some(name.clone()));
+    }
+
+    // If no active DM found, check for graphical sessions
+    let sessions = get_active_graphical_sessions();
+    if !sessions.is_empty() {
+        println!("No active display manager found, but graphical sessions are running.");
+        println!("Terminating graphical sessions for no-reboot GPU switching...");
+        for session_id in sessions {
+            if let Err(e) = terminate_session(&session_id) {
+                error!("Failed to terminate session {}: {}", session_id, e);
+            }
+        }
+        // Give some time for sessions to terminate
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+
+    Ok(None)
+}
+
+fn finalize_no_reboot(stopped_dm: Option<String>) {
+    if let Some(name) = stopped_dm {
+        info!("Starting display manager: {}", name);
+        let _ = manage_service(&name, "start");
+    }
+}
+
+fn switch_integrated(no_reboot: bool) {
     assert_root();
     println!("Switching to integrated mode");
+
+    if !Path::new(CACHE_FILE_PATH).exists() {
+        create_cache_file();
+    }
+
+    cleanup();
+
+    create_file(BLACKLIST_PATH, BLACKLIST_CONTENT, false);
+    create_file(UDEV_INTEGRATED_PATH, UDEV_INTEGRATED, false);
+
+    let mut stopped_dm = None;
+    if no_reboot {
+        match prepare_no_reboot(None) {
+            Ok(dm) => stopped_dm = dm,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        }
+
+        if let Err(e) = kill_gpu_processes() {
+            error!("Failed to kill GPU processes: {}", e);
+        }
+
+        // Try to unload modules
+        let modules = ["nvidia_uvm", "nvidia_modeset", "nvidia_drm", "nvidia"];
+        for module in modules {
+            let _ = Command::new("modprobe").args(["-r", module]).status();
+        }
+
+        if let Some(pci_addr) = get_nvidia_gpu_pci_addr() {
+            if let Err(e) = unbind_gpu(&pci_addr) {
+                error!("Failed to unbind GPU: {}", e);
+            }
+            if let Err(e) = remove_gpu(&pci_addr) {
+                error!("Failed to remove GPU: {}", e);
+            }
+        }
+    }
 
     let is_debug = log::log_enabled!(log::Level::Debug);
     let mut dis_cmd = Command::new("systemctl");
@@ -306,21 +470,17 @@ fn switch_integrated() {
         _ => error!("An error ocurred while disabling service"),
     }
 
-    if get_current_mode() == "hybrid" && !Path::new(CACHE_FILE_PATH).exists() {
-        create_cache_file();
+    if no_reboot {
+        println!("Operation completed successfully");
+        finalize_no_reboot(stopped_dm);
+    } else {
+        rebuild_initramfs();
+        println!("Operation completed successfully");
+        println!("Please reboot your computer for changes to take effect!");
     }
-
-    cleanup();
-
-    create_file(BLACKLIST_PATH, BLACKLIST_CONTENT, false);
-    create_file(UDEV_INTEGRATED_PATH, UDEV_INTEGRATED, false);
-
-    rebuild_initramfs();
-    println!("Operation completed successfully");
-    println!("Please reboot your computer for changes to take effect!");
 }
 
-fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool) {
+fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool, no_reboot: bool) {
     assert_root();
     println!("Switching to hybrid mode");
     println!(
@@ -328,11 +488,30 @@ fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool) {
         rtd3.is_some()
     );
 
-    if get_current_mode() == "hybrid" && !Path::new(CACHE_FILE_PATH).exists() {
+    if no_reboot && let Err(e) = rescan_pci() {
+        error!("Failed to rescan PCI bus: {}", e);
+    }
+
+    if !Path::new(CACHE_FILE_PATH).exists() {
         create_cache_file();
     }
 
     cleanup();
+
+    let mut stopped_dm = None;
+    if no_reboot {
+        match prepare_no_reboot(None) {
+            Ok(dm) => stopped_dm = dm,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        }
+
+        if let Err(e) = kill_gpu_processes() {
+            error!("Failed to kill GPU processes: {}", e);
+        }
+    }
 
     // persistenced enable
     let is_debug = log::log_enabled!(log::Level::Debug);
@@ -370,9 +549,14 @@ fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool) {
         create_file(MODESET_PATH, &modeset_content, false);
     }
 
-    rebuild_initramfs();
-    println!("Operation completed successfully");
-    println!("Please reboot your computer for changes to take effect!");
+    if no_reboot {
+        println!("Operation completed successfully");
+        finalize_no_reboot(stopped_dm);
+    } else {
+        rebuild_initramfs();
+        println!("Operation completed successfully");
+        println!("Please reboot your computer for changes to take effect!");
+    }
 }
 
 fn switch_nvidia(
@@ -381,26 +565,18 @@ fn switch_nvidia(
     coolbits: Option<u32>,
     use_nvidia_current: bool,
     wayland: bool,
+    no_reboot: bool,
 ) {
     assert_root();
     println!("Switching to nvidia mode");
     println!("Enable ForceCompositionPipeline: {}", force_comp);
     println!("Enable Coolbits: {}", coolbits.is_some());
 
-    // persistenced enable
-    let is_debug = log::log_enabled!(log::Level::Debug);
-    let mut enable_cmd = Command::new("systemctl");
-    enable_cmd.args(["enable", "nvidia-persistenced.service"]);
-    if !is_debug {
-        enable_cmd.stdout(std::process::Stdio::null());
-        enable_cmd.stderr(std::process::Stdio::null());
-    }
-    match enable_cmd.status() {
-        Ok(s) if s.success() => println!("Successfully enabled nvidia-persistenced.service"),
-        _ => error!("An error ocurred while enabling service"),
+    if no_reboot && let Err(e) = rescan_pci() {
+        error!("Failed to rescan PCI bus: {}", e);
     }
 
-    if get_current_mode() == "hybrid" && !Path::new(CACHE_FILE_PATH).exists() {
+    if !Path::new(CACHE_FILE_PATH).exists() {
         create_cache_file();
     }
 
@@ -454,7 +630,7 @@ fn switch_nvidia(
             create_file(EXTRA_XORG_PATH, &extra_xorg, false);
         }
 
-        let display_manager = dm.or_else(get_display_manager);
+        let display_manager = dm.clone().or_else(get_display_manager);
 
         if let Some(cdm) = display_manager {
             if cdm == "sddm" {
@@ -480,9 +656,42 @@ fn switch_nvidia(
         }
     }
 
-    rebuild_initramfs();
-    println!("Operation completed successfully");
-    println!("Please reboot your computer for changes to take effect!");
+    let mut stopped_dm = None;
+    if no_reboot {
+        match prepare_no_reboot(dm.clone()) {
+            Ok(dm_name) => stopped_dm = dm_name,
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        }
+
+        if let Err(e) = kill_gpu_processes() {
+            error!("Failed to kill GPU processes: {}", e);
+        }
+    }
+
+    // persistenced enable
+    let is_debug = log::log_enabled!(log::Level::Debug);
+    let mut enable_cmd = Command::new("systemctl");
+    enable_cmd.args(["enable", "nvidia-persistenced.service"]);
+    if !is_debug {
+        enable_cmd.stdout(std::process::Stdio::null());
+        enable_cmd.stderr(std::process::Stdio::null());
+    }
+    match enable_cmd.status() {
+        Ok(s) if s.success() => println!("Successfully enabled nvidia-persistenced.service"),
+        _ => error!("An error ocurred while enabling service"),
+    }
+
+    if no_reboot {
+        println!("Operation completed successfully");
+        finalize_no_reboot(stopped_dm);
+    } else {
+        rebuild_initramfs();
+        println!("Operation completed successfully");
+        println!("Please reboot your computer for changes to take effect!");
+    }
 }
 
 fn run_on_dgpu(command: &[String]) {
@@ -523,6 +732,11 @@ fn run_on_dgpu(command: &[String]) {
 }
 
 pub fn execute(cmd: &GpuCommands) {
+    if try_call_daemon(cmd) {
+        println!("Request handled by lapctld daemon.");
+        return;
+    }
+
     match cmd {
         GpuCommands::Query => {
             let mode = get_current_mode();
@@ -570,23 +784,26 @@ pub fn execute(cmd: &GpuCommands) {
             create_file(SDDM_XSETUP_PATH, SDDM_XSETUP_CONTENT, true);
             println!("Operation completed successfully");
         }
-        GpuCommands::Integrated => switch_integrated(),
+        GpuCommands::Integrated { no_reboot } => switch_integrated(*no_reboot),
         GpuCommands::Hybrid {
             rtd3,
             use_nvidia_current,
-        } => switch_hybrid(*rtd3, *use_nvidia_current),
+            no_reboot,
+        } => switch_hybrid(*rtd3, *use_nvidia_current, *no_reboot),
         GpuCommands::Nvidia {
             dm,
             force_comp,
             coolbits,
             use_nvidia_current,
             wayland,
+            no_reboot,
         } => switch_nvidia(
             dm.clone(),
             *force_comp,
             *coolbits,
             *use_nvidia_current,
             *wayland,
+            *no_reboot,
         ),
         GpuCommands::Run { command } => run_on_dgpu(command),
     }

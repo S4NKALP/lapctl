@@ -64,7 +64,12 @@ pub enum Commands {
         /// Run the inhibitor in the background (daemon mode)
         #[arg(long)]
         daemon: bool,
+        /// Stop any active persistent inhibition managed by the daemon
+        #[arg(long)]
+        stop: bool,
     },
+    /// Start the lapctl background daemon (requires root)
+    Daemon,
 }
 
 #[derive(Subcommand, Debug)]
@@ -72,7 +77,11 @@ pub enum GpuCommands {
     /// Query the current graphics mode
     Query,
     /// Switch to integrated graphics
-    Integrated,
+    Integrated {
+        /// Switch without rebooting (experimental)
+        #[arg(long)]
+        no_reboot: bool,
+    },
     /// Switch to hybrid graphics
     Hybrid {
         /// Setup PCI-Express Runtime D3 (RTD3) Power Management on Hybrid mode (0, 1, 2, 3)
@@ -81,6 +90,9 @@ pub enum GpuCommands {
         /// Use nvidia-current instead of nvidia for kernel modules
         #[arg(long)]
         use_nvidia_current: bool,
+        /// Switch without rebooting (experimental)
+        #[arg(long)]
+        no_reboot: bool,
     },
     /// Switch to NVIDIA graphics
     Nvidia {
@@ -99,6 +111,9 @@ pub enum GpuCommands {
         /// Set up Nvidia mode for Wayland (skips Xorg configuration)
         #[arg(long)]
         wayland: bool,
+        /// Switch without rebooting (experimental)
+        #[arg(long)]
+        no_reboot: bool,
     },
     /// Revert changes made by lapctl
     Reset,

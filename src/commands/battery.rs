@@ -2,8 +2,49 @@ use crate::cli::BatteryCommands;
 use log::{debug, error, info};
 use std::fs;
 use std::path::Path;
+use zbus::Connection;
+use zbus::proxy;
+
+#[proxy(
+    interface = "org.lapctl1",
+    default_service = "org.lapctl",
+    default_path = "/org/lapctl"
+)]
+trait Lapctl {
+    async fn set_battery_limit(&self, percent: u32) -> zbus::Result<()>;
+}
+
+fn try_call_daemon(command: &BatteryCommands) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+
+    rt.block_on(async {
+        let connection = match Connection::system().await {
+            Ok(conn) => conn,
+            Err(_) => return false,
+        };
+        let proxy = match LapctlProxy::new(&connection).await {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        match command {
+            BatteryCommands::Limit { percent } => {
+                proxy.set_battery_limit(*percent as u32).await.is_ok()
+            }
+            _ => false,
+        }
+    })
+}
 
 pub fn execute(command: &BatteryCommands) {
+    if matches!(command, BatteryCommands::Limit { .. }) && try_call_daemon(command) {
+        println!("Request handled by lapctld daemon.");
+        return;
+    }
+
     match command {
         BatteryCommands::Limit { percent } => {
             if !(&1..=&100).contains(&percent) {
