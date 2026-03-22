@@ -35,10 +35,8 @@ Built with performance and simplicity in mind, it talks directly to your system'
 
 #### Option 1: Arch Linux (AUR)
 
-If you are on Arch Linux, you can install **lapctl-git** from the AUR. This is the recommended method for Arch users as it automatically handles dependencies and udev rules.
-
 ```bash
-yay -S lapctl-git
+yay -S lapctl
 ```
 
 #### Option 2: Using `just` (Recommended for other distros)
@@ -50,7 +48,7 @@ just install
 sudo lapctl install-rules
 ```
 
-*The `install-rules` command automatically sets up the D-Bus policy and starts the `lapctld` background service.*
+_The `install-rules` command automatically sets up the D-Bus policy and starts the `lapctld` background service._
 
 #### Option 3: Using `cargo`
 
