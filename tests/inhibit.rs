@@ -11,6 +11,7 @@ fn test_inhibit_cli_parsing() {
         why,
         who,
         daemon,
+        stop: _,
     } = cli.command
     {
         assert_eq!(command, vec!["sleep".to_string(), "10".to_string()]);
@@ -30,8 +31,9 @@ fn test_inhibit_daemon_parsing() {
     if let Commands::Inhibit {
         command,
         why,
-        who,
+        who: _,
         daemon,
+        stop: _,
     } = cli.command
     {
         assert!(command.is_empty());
