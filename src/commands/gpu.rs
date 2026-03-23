@@ -40,10 +40,6 @@ trait Lapctl {
 }
 
 fn try_call_daemon(cmd: &GpuCommands) -> bool {
-    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
-        return false;
-    }
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
@@ -748,11 +744,21 @@ fn run_on_dgpu(command: &[String]) {
 }
 
 pub fn execute(cmd: &GpuCommands) {
+    match cmd {
+        GpuCommands::Integrated { .. } => println!("Switching to Integrated GPU mode..."),
+        GpuCommands::Hybrid { .. } => println!("Switching to Hybrid GPU mode..."),
+        GpuCommands::Nvidia { .. } => println!("Switching to NVIDIA-only GPU mode..."),
+        _ => {}
+    }
+
     if try_call_daemon(cmd) {
-        println!("Request handled by lapctld daemon.");
         return;
     }
 
+    execute_local(cmd);
+}
+
+pub fn execute_local(cmd: &GpuCommands) {
     match cmd {
         GpuCommands::Query => {
             let mode = get_current_mode();

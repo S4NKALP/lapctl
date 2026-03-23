@@ -1,5 +1,5 @@
 use crate::cli::TouchpadCommands;
-use log::{error, info};
+use log::{debug, error, info};
 use std::fs;
 use std::path::Path;
 use zbus::Connection;
@@ -15,10 +15,6 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &TouchpadCommands) -> bool {
-    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
-        return false;
-    }
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
@@ -60,56 +56,64 @@ fn try_call_daemon(command: &TouchpadCommands) -> bool {
 }
 
 pub fn execute(command: &TouchpadCommands) {
+    match command {
+        TouchpadCommands::Enable => println!("Enabling touchpad..."),
+        TouchpadCommands::Disable => println!("Disabling touchpad..."),
+    }
+
     if try_call_daemon(command) {
-        println!("Request handled by lapctld daemon.");
         return;
     }
 
-    let sys_class_input = Path::new("/sys/class/input");
-    if !sys_class_input.exists() {
+    execute_local(command);
+}
+
+pub fn execute_local(command: &TouchpadCommands) {
+    match command {
+        TouchpadCommands::Enable => set_touchpad_inhibition(false),
+        TouchpadCommands::Disable => set_touchpad_inhibition(true),
+    }
+}
+
+fn set_touchpad_inhibition(inhibited: bool) {
+    let dev_input = Path::new("/sys/class/input");
+    if !dev_input.exists() {
         error!("Could not find /sys/class/input. Is this a Linux system?");
         return;
     }
 
-    let mut found_touchpads = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(sys_class_input) {
+    if let Ok(entries) = fs::read_dir(dev_input) {
+        let mut found = false;
         for entry in entries.flatten() {
-            let path = entry.path();
-            let name_path = path.join("name");
-            let inhibited_path = path.join("inhibited");
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
 
-            if name_path.exists()
-                && inhibited_path.exists()
-                && let Ok(name) = fs::read_to_string(&name_path)
-                && name.to_lowercase().contains("touchpad")
-            {
-                found_touchpads.push((name.trim().to_string(), inhibited_path));
-            }
-        }
-    }
-
-    if found_touchpads.is_empty() {
-        error!("No touchpad devices found with 'inhibited' support in /sys/class/input.");
-        return;
-    }
-
-    match command {
-        TouchpadCommands::Enable => {
-            for (name, path) in found_touchpads {
-                match fs::write(&path, "0") {
-                    Ok(_) => info!("Enabled touchpad: {}", name),
-                    Err(e) => error!("Failed to enable touchpad {}: {}", name, e),
+            if name_str.starts_with("input") {
+                let name_file = entry.path().join("name");
+                if let Ok(content) = fs::read_to_string(name_file) {
+                    let content_lower = content.to_lowercase();
+                    if content_lower.contains("touchpad") || content_lower.contains("trackpad") {
+                        found = true;
+                        let inhibited_file = entry.path().join("inhibited");
+                        if inhibited_file.exists() {
+                            let val = if inhibited { "1" } else { "0" };
+                            match fs::write(&inhibited_file, val) {
+                                Ok(_) => info!("Set inhibit={} for {}", inhibited, name_str),
+                                Err(e) => {
+                                    debug!("Failed to write to {}: {}", inhibited_file.display(), e)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-        TouchpadCommands::Disable => {
-            for (name, path) in found_touchpads {
-                match fs::write(&path, "1") {
-                    Ok(_) => info!("Disabled touchpad: {}", name),
-                    Err(e) => error!("Failed to disable touchpad {}: {}", name, e),
-                }
-            }
+        if found {
+            println!("Operation completed successfully.");
+        } else {
+            error!("No touchpad device found in /sys/class/input.");
         }
+    } else {
+        error!("Failed to read directory /sys/class/input.");
     }
 }

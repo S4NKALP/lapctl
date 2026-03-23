@@ -20,7 +20,7 @@ const POLKIT_POLICY: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>yes</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/lapctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">{EXE_PATH}</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">false</annotate>
   </action>
 </policyconfig>
@@ -66,7 +66,7 @@ After=dbus.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/lapctl daemon
+ExecStart={EXE_PATH} daemon
 Restart=on-failure
 
 [Install]
@@ -76,21 +76,27 @@ WantedBy=multi-user.target
 pub fn execute() {
     assert_root();
 
-    println!("Installing lapctl configuration for daemon communication...");
+    let current_exe = std::env::current_exe().expect("Failed to get current executable path");
+    let exe_path = current_exe.to_str().expect("Invalid executable path");
+
+    println!("Found lapctl at: {}", exe_path);
+    println!("Installing lapctl configuration with dynamic paths...");
 
     let dbus_policy_path = "/etc/dbus-1/system.d/org.lapctl.conf";
     create_file(dbus_policy_path, DBUS_POLICY, false);
 
+    let systemd_content = SYSTEMD_SERVICE.replace("{EXE_PATH}", exe_path);
     let service_path = "/etc/systemd/system/lapctld.service";
-    create_file(service_path, SYSTEMD_SERVICE, false);
+    create_file(service_path, &systemd_content, false);
 
     // Also install the udev rules file (even if empty now) to avoid errors if it was previously there
     let rules_path = "/etc/udev/rules.d/99-lapctl.rules";
     create_file(rules_path, LAPCTL_UDEV_RULES, false);
 
     // Polkit fallbacks for rootless execution without the daemon
+    let polkit_content = POLKIT_POLICY.replace("{EXE_PATH}", exe_path);
     let polkit_policy_path = "/usr/share/polkit-1/actions/org.lapctl.policy";
-    create_file(polkit_policy_path, POLKIT_POLICY, false);
+    create_file(polkit_policy_path, &polkit_content, false);
 
     let polkit_rules_path = "/etc/polkit-1/rules.d/10-lapctl.rules";
     create_file(polkit_rules_path, POLKIT_RULES, false);
@@ -115,5 +121,5 @@ pub fn execute() {
     }
 
     println!("Installation successful! The lapctld daemon is now running.");
-    println!("You can now use all lapctl commands without sudo.");
+    println!("You can now use all lapctl commands from any location.");
 }

@@ -15,11 +15,6 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &CoolingCommands) -> bool {
-    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
-        debug!("Internal daemon call detected. Skipping D-Bus self-call.");
-        return false;
-    }
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
@@ -102,11 +97,21 @@ fn set_asus_throttle_policy(mode: &str) -> bool {
 }
 
 pub fn execute(command: &CoolingCommands) {
+    let desc = match command {
+        CoolingCommands::Performance => "Performance",
+        CoolingCommands::Balanced => "Balanced",
+        CoolingCommands::Quiet => "Quiet",
+    };
+    println!("Setting thermal/cooling profile to {}", desc);
+
     if try_call_daemon(command) {
-        println!("Request handled by lapctld daemon.");
         return;
     }
 
+    execute_local(command);
+}
+
+pub fn execute_local(command: &CoolingCommands) {
     let (ideapad_mode, asus_mode, desc) = match command {
         CoolingCommands::Performance => ("1", "1", "Performance"),
         CoolingCommands::Balanced => ("0", "0", "Balanced"),

@@ -16,10 +16,6 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &PowerCommands) -> bool {
-    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
-        return false;
-    }
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
@@ -226,11 +222,23 @@ fn set_platform_profile(profile: &str) {
 }
 
 pub fn execute(command: &PowerCommands) {
+    match command {
+        PowerCommands::Performance => println!("Setting power profile to Performance"),
+        PowerCommands::Balanced => println!("Setting power profile to Balanced"),
+        PowerCommands::BatterySave => println!("Setting power profile to Battery Saver"),
+        PowerCommands::LimitTdp { watts } => {
+            println!("Setting CPU Package TDP Limit to {} Watts...", watts)
+        }
+    }
+
     if try_call_daemon(command) {
-        println!("Request handled by lapctld daemon.");
         return;
     }
 
+    execute_local(command);
+}
+
+pub fn execute_local(command: &PowerCommands) {
     match command {
         PowerCommands::Performance => {
             println!("Setting power profile to Performance");
@@ -242,8 +250,6 @@ pub fn execute(command: &PowerCommands) {
         PowerCommands::Balanced => {
             println!("Setting power profile to Balanced");
             set_platform_profile("balanced");
-            // Schedutil is the modern balanced default. Fallback isn't critical since cpufreq
-            // usually rejects invalid profiles, and standard Intel/AMD systems use EPP now anyway.
             set_cpu_governor("schedutil");
             set_energy_performance_preference("balance_performance");
             println!("Operation completed successfully.");

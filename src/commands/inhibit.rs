@@ -18,10 +18,6 @@ trait Lapctl {
 }
 
 fn try_call_daemon_inhibit(active: bool, why: String, who: String) -> bool {
-    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
-        return false;
-    }
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
@@ -62,6 +58,10 @@ pub fn execute(command_args: &[String], why: &str, who: &str, daemon: bool, stop
     }
 
     if daemon && command_args.is_empty() {
+        println!(
+            "Attempting to activate system inhibition via lapctld: '{}' by '{}'",
+            why, who
+        );
         if try_call_daemon_inhibit(true, why.to_string(), who.to_string()) {
             println!("Persistent system inhibition activated via lapctld.");
             println!("The system will stay awake until you run: lapctl inhibit --stop");
