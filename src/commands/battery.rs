@@ -14,6 +14,10 @@ trait Lapctl {
     async fn set_battery_limit(&self, percent: u32) -> zbus::Result<()>;
 }
 
+fn is_ideapad() -> bool {
+    Path::new("/sys/bus/platform/drivers/ideapad_acpi").exists()
+}
+
 fn try_call_daemon(command: &BatteryCommands) -> bool {
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
@@ -56,6 +60,16 @@ pub fn execute(command: &BatteryCommands) {
                 error!("Invalid percentage. Please provide a value between 1 and 100.");
                 std::process::exit(1);
             }
+
+            if is_ideapad() {
+                if *percent < 100 {
+                    println!("Setting battery charge limit (Lenovo Conservation Mode ~60%)...");
+                } else {
+                    println!("Disabling battery charge limit (charging to 100%)...");
+                }
+            } else {
+                println!("Setting battery charge limit to {}%...", percent);
+            }
         }
         BatteryCommands::Status => {}
     }
@@ -80,20 +94,6 @@ pub fn execute_local(command: &BatteryCommands) {
                         let val = if *percent < 100 { "1" } else { "0" };
                         match fs::write(&conservation_path, val) {
                             Ok(_) => {
-                                if *percent < 100 {
-                                    println!(
-                                        "WARNING: Your laptop (Lenovo Ideapad) does NOT support custom charge limits (like {}%).",
-                                        percent
-                                    );
-                                    println!(
-                                        "Instead, lapctl has enabled Lenovo's built-in 'Conservation Mode' via the Ideapad ACPI."
-                                    );
-                                    println!(
-                                        "This mode is hard-coded into your laptop's firmware to stop charging at ~60%."
-                                    );
-                                } else {
-                                    println!("Disabled Conservation Mode (charging to 100%).");
-                                }
                                 success_count += 1;
                             }
                             Err(e) => {
