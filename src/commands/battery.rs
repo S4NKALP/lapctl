@@ -15,27 +15,41 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &BatteryCommands) -> bool {
+    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
+        return false;
+    }
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
     };
 
     rt.block_on(async {
-        let connection = match Connection::system().await {
-            Ok(conn) => conn,
-            Err(_) => return false,
-        };
+        let connection =
+            match tokio::time::timeout(std::time::Duration::from_secs(2), Connection::system())
+                .await
+            {
+                Ok(Ok(conn)) => conn,
+                _ => return false,
+            };
+
         let proxy = match LapctlProxy::new(&connection).await {
             Ok(p) => p,
             Err(_) => return false,
         };
 
-        match command {
+        let res = match command {
             BatteryCommands::Limit { percent } => {
-                proxy.set_battery_limit(*percent as u32).await.is_ok()
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_battery_limit(*percent as u32),
+                )
+                .await
             }
-            _ => false,
-        }
+            _ => return false,
+        };
+
+        matches!(res, Ok(Ok(_)))
     })
 }
 

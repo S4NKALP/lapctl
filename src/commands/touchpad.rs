@@ -15,25 +15,47 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &TouchpadCommands) -> bool {
+    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
+        return false;
+    }
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
     };
 
     rt.block_on(async {
-        let connection = match Connection::system().await {
-            Ok(conn) => conn,
-            Err(_) => return false,
-        };
+        let connection =
+            match tokio::time::timeout(std::time::Duration::from_secs(2), Connection::system())
+                .await
+            {
+                Ok(Ok(conn)) => conn,
+                _ => return false,
+            };
+
         let proxy = match LapctlProxy::new(&connection).await {
             Ok(p) => p,
             Err(_) => return false,
         };
 
-        match command {
-            TouchpadCommands::Enable => proxy.set_touchpad_inhibition(false).await.is_ok(),
-            TouchpadCommands::Disable => proxy.set_touchpad_inhibition(true).await.is_ok(),
-        }
+        let res = match command {
+            TouchpadCommands::Enable => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_touchpad_inhibition(false),
+                )
+                .await
+            }
+            TouchpadCommands::Disable => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_touchpad_inhibition(true),
+                )
+                .await
+            }
+        };
+
+        matches!(res, Ok(Ok(_)))
     })
 }
 

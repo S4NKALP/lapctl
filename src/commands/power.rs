@@ -16,36 +16,61 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &PowerCommands) -> bool {
+    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
+        return false;
+    }
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
     };
 
     rt.block_on(async {
-        let connection = match Connection::system().await {
-            Ok(conn) => conn,
-            Err(_) => return false,
-        };
+        let connection =
+            match tokio::time::timeout(std::time::Duration::from_secs(2), Connection::system())
+                .await
+            {
+                Ok(Ok(conn)) => conn,
+                _ => return false,
+            };
+
         let proxy = match LapctlProxy::new(&connection).await {
             Ok(p) => p,
             Err(_) => return false,
         };
 
-        match command {
-            PowerCommands::Performance => proxy
-                .set_power_profile("performance".to_string())
+        let res = match command {
+            PowerCommands::Performance => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_power_profile("performance".to_string()),
+                )
                 .await
-                .is_ok(),
-            PowerCommands::Balanced => proxy
-                .set_power_profile("balanced".to_string())
+            }
+            PowerCommands::Balanced => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_power_profile("balanced".to_string()),
+                )
                 .await
-                .is_ok(),
-            PowerCommands::BatterySave => proxy
-                .set_power_profile("battery-save".to_string())
+            }
+            PowerCommands::BatterySave => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_power_profile("battery-save".to_string()),
+                )
                 .await
-                .is_ok(),
-            PowerCommands::LimitTdp { watts } => proxy.set_tdp_limit(*watts).await.is_ok(),
-        }
+            }
+            PowerCommands::LimitTdp { watts } => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_tdp_limit(*watts),
+                )
+                .await
+            }
+        };
+
+        matches!(res, Ok(Ok(_)))
     })
 }
 

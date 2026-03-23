@@ -15,32 +15,55 @@ trait Lapctl {
 }
 
 fn try_call_daemon(command: &CoolingCommands) -> bool {
+    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
+        debug!("Internal daemon call detected. Skipping D-Bus self-call.");
+        return false;
+    }
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
     };
 
     rt.block_on(async {
-        let connection = match Connection::system().await {
-            Ok(conn) => conn,
-            Err(_) => return false,
-        };
+        let connection =
+            match tokio::time::timeout(std::time::Duration::from_secs(2), Connection::system())
+                .await
+            {
+                Ok(Ok(conn)) => conn,
+                _ => return false,
+            };
+
         let proxy = match LapctlProxy::new(&connection).await {
             Ok(p) => p,
             Err(_) => return false,
         };
 
-        match command {
-            CoolingCommands::Performance => proxy
-                .set_cooling_profile("performance".to_string())
+        let res = match command {
+            CoolingCommands::Performance => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_cooling_profile("performance".to_string()),
+                )
                 .await
-                .is_ok(),
-            CoolingCommands::Balanced => proxy
-                .set_cooling_profile("balanced".to_string())
+            }
+            CoolingCommands::Balanced => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_cooling_profile("balanced".to_string()),
+                )
                 .await
-                .is_ok(),
-            CoolingCommands::Quiet => proxy.set_cooling_profile("quiet".to_string()).await.is_ok(),
-        }
+            }
+            CoolingCommands::Quiet => {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    proxy.set_cooling_profile("quiet".to_string()),
+                )
+                .await
+            }
+        };
+
+        matches!(res, Ok(Ok(_)))
     })
 }
 

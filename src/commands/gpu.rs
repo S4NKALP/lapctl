@@ -40,24 +40,36 @@ trait Lapctl {
 }
 
 fn try_call_daemon(cmd: &GpuCommands) -> bool {
+    if std::env::var("LAPCTL_DAEMON_INTERNAL").is_ok() {
+        return false;
+    }
+
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
         Err(_) => return false,
     };
 
     rt.block_on(async {
-        let connection = match Connection::system().await {
-            Ok(conn) => conn,
-            Err(_) => return false,
-        };
+        let connection =
+            match tokio::time::timeout(std::time::Duration::from_secs(2), Connection::system())
+                .await
+            {
+                Ok(Ok(conn)) => conn,
+                _ => return false,
+            };
+
         let proxy = match LapctlProxy::new(&connection).await {
             Ok(p) => p,
             Err(_) => return false,
         };
 
-        match cmd {
+        let res = match cmd {
             GpuCommands::Integrated { no_reboot } => {
-                proxy.switch_gpu_integrated(*no_reboot).await.is_ok()
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    proxy.switch_gpu_integrated(*no_reboot),
+                )
+                .await
             }
             GpuCommands::Hybrid {
                 rtd3,
@@ -65,10 +77,11 @@ fn try_call_daemon(cmd: &GpuCommands) -> bool {
                 no_reboot,
             } => {
                 let rtd3_val = rtd3.map(|v| v as i32).unwrap_or(-1);
-                proxy
-                    .switch_gpu_hybrid(rtd3_val, *use_nvidia_current, *no_reboot)
-                    .await
-                    .is_ok()
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    proxy.switch_gpu_hybrid(rtd3_val, *use_nvidia_current, *no_reboot),
+                )
+                .await
             }
             GpuCommands::Nvidia {
                 dm,
@@ -80,20 +93,23 @@ fn try_call_daemon(cmd: &GpuCommands) -> bool {
             } => {
                 let dm_val = dm.clone().unwrap_or_default();
                 let coolbits_val = coolbits.map(|v| v as i32).unwrap_or(-1);
-                proxy
-                    .switch_gpu_nvidia(
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    proxy.switch_gpu_nvidia(
                         dm_val,
                         *force_comp,
                         coolbits_val,
                         *use_nvidia_current,
                         *wayland,
                         *no_reboot,
-                    )
-                    .await
-                    .is_ok()
+                    ),
+                )
+                .await
             }
-            _ => false,
-        }
+            _ => return false,
+        };
+
+        matches!(res, Ok(Ok(_)))
     })
 }
 
