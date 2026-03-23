@@ -20,7 +20,7 @@ impl Default for LapctlInterface {
 #[interface(name = "org.lapctl1")]
 impl LapctlInterface {
     pub async fn switch_gpu_integrated(&self, no_reboot: bool) -> zbus::fdo::Result<()> {
-        gpu::execute(&GpuCommands::Integrated { no_reboot });
+        gpu::execute_local(&GpuCommands::Integrated { no_reboot });
         Ok(())
     }
 
@@ -31,7 +31,7 @@ impl LapctlInterface {
         no_reboot: bool,
     ) -> zbus::fdo::Result<()> {
         let rtd3_opt = if rtd3 < 0 { None } else { Some(rtd3 as u8) };
-        gpu::execute(&GpuCommands::Hybrid {
+        gpu::execute_local(&GpuCommands::Hybrid {
             rtd3: rtd3_opt,
             use_nvidia_current,
             no_reboot,
@@ -54,7 +54,7 @@ impl LapctlInterface {
         } else {
             Some(coolbits as u32)
         };
-        gpu::execute(&GpuCommands::Nvidia {
+        gpu::execute_local(&GpuCommands::Nvidia {
             dm: dm_opt,
             force_comp,
             coolbits: coolbits_opt,
@@ -66,7 +66,7 @@ impl LapctlInterface {
     }
 
     pub async fn set_battery_limit(&self, percent: u32) -> zbus::fdo::Result<()> {
-        crate::commands::battery::execute(&crate::cli::BatteryCommands::Limit {
+        crate::commands::battery::execute_local(&crate::cli::BatteryCommands::Limit {
             percent: percent as u8,
         });
         Ok(())
@@ -84,12 +84,12 @@ impl LapctlInterface {
                 )));
             }
         };
-        crate::commands::power::execute(&cmd);
+        crate::commands::power::execute_local(&cmd);
         Ok(())
     }
 
     pub async fn set_tdp_limit(&self, watts: u32) -> zbus::fdo::Result<()> {
-        crate::commands::power::execute(&crate::cli::PowerCommands::LimitTdp { watts });
+        crate::commands::power::execute_local(&crate::cli::PowerCommands::LimitTdp { watts });
         Ok(())
     }
 
@@ -105,7 +105,7 @@ impl LapctlInterface {
                 )));
             }
         };
-        crate::commands::cooling::execute(&cmd);
+        crate::commands::cooling::execute_local(&cmd);
         Ok(())
     }
 
@@ -115,7 +115,7 @@ impl LapctlInterface {
         } else {
             crate::cli::TouchpadCommands::Enable
         };
-        crate::commands::touchpad::execute(&cmd);
+        crate::commands::touchpad::execute_local(&cmd);
         Ok(())
     }
 
