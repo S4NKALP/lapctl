@@ -56,7 +56,6 @@ pub fn execute(command: &BatteryCommands) {
                 error!("Invalid percentage. Please provide a value between 1 and 100.");
                 std::process::exit(1);
             }
-            println!("Setting battery charge limit to {}%", percent);
         }
         BatteryCommands::Status => {}
     }
@@ -72,6 +71,41 @@ pub fn execute_local(command: &BatteryCommands) {
     match command {
         BatteryCommands::Limit { percent } => {
             let mut success_count = 0;
+
+            // Ideapad fallback - search for conservation_mode in ideapad_acpi driver directories
+            if let Ok(drivers) = fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi") {
+                for entry in drivers.flatten() {
+                    let conservation_path = entry.path().join("conservation_mode");
+                    if conservation_path.exists() {
+                        let val = if *percent < 100 { "1" } else { "0" };
+                        match fs::write(&conservation_path, val) {
+                            Ok(_) => {
+                                if *percent < 100 {
+                                    println!(
+                                        "WARNING: Your laptop (Lenovo Ideapad) does NOT support custom charge limits (like {}%).",
+                                        percent
+                                    );
+                                    println!(
+                                        "Instead, lapctl has enabled Lenovo's built-in 'Conservation Mode' via the Ideapad ACPI."
+                                    );
+                                    println!(
+                                        "This mode is hard-coded into your laptop's firmware to stop charging at ~60%."
+                                    );
+                                } else {
+                                    println!("Disabled Conservation Mode (charging to 100%).");
+                                }
+                                success_count += 1;
+                            }
+                            Err(e) => {
+                                debug!("Failed to write to {}: {}", conservation_path.display(), e)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Only try standard thresholds if we haven't already succeeded with Ideapad fallback
+            // or if we want to ensure all bases are covered. For now, let's do both but prioritize the message.
             let sys_class_power = Path::new("/sys/class/power_supply");
 
             if let Ok(entries) = fs::read_dir(sys_class_power) {
@@ -82,6 +116,10 @@ pub fn execute_local(command: &BatteryCommands) {
                     if name_str.starts_with("BAT") {
                         let threshold_path = entry.path().join("charge_control_end_threshold");
                         if threshold_path.exists() {
+                            println!(
+                                "Setting battery charge limit for {} to {}%",
+                                name_str, percent
+                            );
                             match fs::write(&threshold_path, percent.to_string()) {
                                 Ok(_) => {
                                     info!("Successfully set limit for {}", name_str);
@@ -89,36 +127,6 @@ pub fn execute_local(command: &BatteryCommands) {
                                 }
                                 Err(e) => {
                                     debug!("Failed to write to {}: {}", threshold_path.display(), e)
-                                }
-                            }
-                        } else {
-                            // Ideapad fallback
-                            let conservation_path = Path::new(
-                                "/sys/bus/platform/devices/ideapad_acpi/conservation_mode",
-                            );
-                            if conservation_path.exists() {
-                                let val = if *percent < 100 { "1" } else { "0" };
-                                match fs::write(conservation_path, val) {
-                                    Ok(_) => {
-                                        if *percent < 100 {
-                                            println!(
-                                                "WARNING: Your laptop (Lenovo Ideapad) does NOT support custom charge limits (like {}%).",
-                                                percent
-                                            );
-                                            println!(
-                                                "Instead, lapctl has enabled Lenovo's built-in 'Conservation Mode' via the Ideapad ACPI."
-                                            );
-                                            println!(
-                                                "This mode is hard-coded into your laptop's firmware to stop charging at ~60%."
-                                            );
-                                        } else {
-                                            println!(
-                                                "Disabled Conservation Mode (charging to 100%)."
-                                            );
-                                        }
-                                        success_count += 1;
-                                    }
-                                    Err(e) => debug!("Failed to write to conservation_mode: {}", e),
                                 }
                             }
                         }
@@ -151,22 +159,41 @@ pub fn execute_local(command: &BatteryCommands) {
                         println!("  Capacity: {}%", capacity.trim());
                         println!("  Status: {}", status.trim());
 
-                        if let Ok(limit) =
-                            fs::read_to_string(bat_path.join("charge_control_end_threshold"))
+                        // Check for Ideapad conservation mode first using robust detection
+                        let mut limit_shown = false;
+                        if let Ok(drivers) = fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi")
                         {
-                            println!("  Charge Limit: {}%", limit.trim());
-                        } else {
-                            // Ideapad fallback display
-                            let conservation_path = Path::new(
-                                "/sys/bus/platform/devices/ideapad_acpi/conservation_mode",
-                            );
-                            if conservation_path.exists()
-                                && let Ok(mode) = fs::read_to_string(conservation_path)
+                            for entry in drivers.flatten() {
+                                let conservation_path = entry.path().join("conservation_mode");
+                                if conservation_path.exists()
+                                    && let Ok(mode) = fs::read_to_string(&conservation_path)
+                                {
+                                    if mode.trim() == "1" {
+                                        println!("  Charge Limit: Conservation Mode (~60%)");
+                                        limit_shown = true;
+                                    } else if mode.trim() == "0" {
+                                        // On Ideapads 0 means 100% or off.
+                                    }
+                                }
+                            }
+                        }
+
+                        if !limit_shown {
+                            if let Ok(limit) =
+                                fs::read_to_string(bat_path.join("charge_control_end_threshold"))
                             {
-                                if mode.trim() == "1" {
-                                    println!("  Charge Limit: Conservation Mode (~60%)");
-                                } else {
-                                    println!("  Charge Limit: 100%");
+                                println!("  Charge Limit: {}%", limit.trim());
+                            } else {
+                                // Re-check if it's an ideapad and we haven't shown a limit (likely 100%)
+                                if let Ok(drivers) =
+                                    fs::read_dir("/sys/bus/platform/drivers/ideapad_acpi")
+                                {
+                                    for entry in drivers.flatten() {
+                                        if entry.path().join("conservation_mode").exists() {
+                                            println!("  Charge Limit: 100%");
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
