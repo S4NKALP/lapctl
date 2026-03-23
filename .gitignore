@@ -24,5 +24,4 @@ target
 # Added by cargo
 
 /target
-./lapctl.py
-lapctl.py
+./PKGBUILD

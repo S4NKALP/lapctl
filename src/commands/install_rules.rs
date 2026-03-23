@@ -12,7 +12,7 @@ const POLKIT_POLICY: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <policyconfig>
   <vendor>lapctl</vendor>
   <vendor_url>https://github.com/S4NKALP/lapctl</vendor_url>
-  <action id="org.s4nkalp.lapctl.execute">
+  <action id="org.lapctl.execute">
     <description>Elevated execution for lapctl</description>
     <message>Authentication is required to perform privileged lapctl operations</message>
     <defaults>
@@ -89,7 +89,7 @@ pub fn execute() {
     create_file(rules_path, LAPCTL_UDEV_RULES, false);
 
     // Polkit fallbacks for rootless execution without the daemon
-    let polkit_policy_path = "/usr/share/polkit-1/actions/org.s4nkalp.lapctl.policy";
+    let polkit_policy_path = "/usr/share/polkit-1/actions/org.lapctl.policy";
     create_file(polkit_policy_path, POLKIT_POLICY, false);
 
     let polkit_rules_path = "/etc/polkit-1/rules.d/10-lapctl.rules";
