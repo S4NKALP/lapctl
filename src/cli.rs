@@ -51,23 +51,6 @@ pub enum Commands {
         #[command(subcommand)]
         command: TouchpadCommands,
     },
-    /// Inhibit system sleep/suspend
-    Inhibit {
-        /// The command to run while inhibiting (optional)
-        command: Vec<String>,
-        /// Why the system is being inhibited
-        #[arg(long, default_value = "lapctl inhibiting sleep")]
-        why: String,
-        /// Who is inhibiting the system
-        #[arg(long, default_value = "lapctl")]
-        who: String,
-        /// Run the inhibitor in the background (daemon mode)
-        #[arg(long)]
-        daemon: bool,
-        /// Stop any active persistent inhibition managed by the daemon
-        #[arg(long)]
-        stop: bool,
-    },
     /// Start the lapctl background daemon (requires root)
     Daemon,
 }

@@ -30,13 +30,6 @@ fn main() {
         Commands::Status => commands::status::execute(),
         Commands::InstallRules => commands::install_rules::execute(),
         Commands::Touchpad { command } => commands::touchpad::execute(command),
-        Commands::Inhibit {
-            command,
-            why,
-            who,
-            daemon,
-            stop,
-        } => commands::inhibit::execute(command, why, who, *daemon, *stop),
         Commands::Daemon => {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
