@@ -24,7 +24,6 @@ Built with performance and simplicity in mind, it talks directly to your system'
 - **Intelligent Cooling**: Force your fans into Performance, Balanced, or Quiet modes (supporting ASUS and Lenovo laptops).
 - **Display Refresh Rate**: Easily query available refresh rates and change your active display's Hz on-the-fly (100% native Rust Wayland implementation using `zwlr_output_manager_v1` for wlroots compositors like Sway and Hyprland).
 - **Touchpad Toggle**: Quickly enable or disable your touchpad from the terminal when using an external mouse.
-- **Sleep Inhibitor**: Running a long compile or a critical download? Use the inhibitor to stop your laptop from falling asleep mid task.
 - **Instant Status**: Get a bird's eye view of your hardware state, battery health, and current limits with one simple command.
 
 ---
@@ -59,7 +58,6 @@ sudo lapctl install-rules
 
 #### Requirements
 
-- **systemd**: For sleep inhibitor (`systemd-inhibit`)
 - **GPU Switching (Optional)**: `xrandr` and `nvidia-settings` are strictly required **ONLY** when using the `lapctl gpu` command on X11 (to route proprietary NVIDIA Optimus drivers).
 - **Wayland Display**: Built entirely natively using `wayland-client` and `wayland-protocols-wlr` (no `wlr-randr` required!)
 
@@ -103,11 +101,6 @@ lapctl touchpad enable
 # Manage your display refresh rate
 lapctl display rates
 lapctl display set-rate 144
-
-# Keep it awake (requires lapctld)
-lapctl inhibit --daemon  # Stay awake persistently (via daemon)
-lapctl inhibit --stop    # Allow sleep again
-lapctl inhibit --why "Keeping awake" -- sleep 60 # One-shot (local)
 
 # Check everything
 lapctl status
