@@ -2,13 +2,8 @@ use crate::cli::GpuCommands;
 use crate::commands::gpu;
 use zbus::interface;
 
+#[derive(Default)]
 pub struct LapctlInterface {}
-
-impl Default for LapctlInterface {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 #[interface(name = "org.lapctl1")]
 impl LapctlInterface {
