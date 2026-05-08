@@ -1,19 +1,12 @@
 use crate::cli::GpuCommands;
 use crate::commands::gpu;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use zbus::interface;
-use zbus::zvariant::OwnedFd;
 
-pub struct LapctlInterface {
-    inhibit_fd: Arc<Mutex<Option<OwnedFd>>>,
-}
+pub struct LapctlInterface {}
 
 impl Default for LapctlInterface {
     fn default() -> Self {
-        Self {
-            inhibit_fd: Arc::new(Mutex::new(None)),
-        }
+        Self {}
     }
 }
 
@@ -116,49 +109,6 @@ impl LapctlInterface {
             crate::cli::TouchpadCommands::Enable
         };
         crate::commands::touchpad::execute_local(&cmd);
-        Ok(())
-    }
-
-    pub async fn set_system_inhibition(
-        &self,
-        active: bool,
-        why: String,
-        who: String,
-    ) -> zbus::fdo::Result<()> {
-        let mut fd_lock = self.inhibit_fd.lock().await;
-
-        if active {
-            if fd_lock.is_some() {
-                return Ok(()); // Already inhibiting
-            }
-
-            let conn = zbus::Connection::system().await.map_err(|e| {
-                zbus::fdo::Error::Failed(format!("Failed to connect to system bus: {}", e))
-            })?;
-
-            let msg = conn
-                .call_method(
-                    Some("org.freedesktop.login1"),
-                    "/org/freedesktop/login1",
-                    Some("org.freedesktop.login1.Manager"),
-                    "Inhibit",
-                    &("sleep:idle", who, why, "block"),
-                )
-                .await
-                .map_err(|e| zbus::fdo::Error::Failed(format!("Failed to inhibit: {}", e)))?;
-
-            let fd: OwnedFd = msg
-                .body()
-                .deserialize()
-                .map_err(|e| zbus::fdo::Error::Failed(format!("Failed to parse FD: {}", e)))?;
-
-            *fd_lock = Some(fd);
-            log::info!("System inhibition activated via lapctld.");
-        } else {
-            *fd_lock = None;
-            log::info!("System inhibition deactivated via lapctld.");
-        }
-
         Ok(())
     }
 }
