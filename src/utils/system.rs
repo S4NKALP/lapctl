@@ -148,20 +148,6 @@ pub fn rebuild_initramfs() {
         command = vec!["mkinitcpio", "-P"];
     }
 
-    if let Ok(which) = Command::new("which").arg("systemd-inhibit").output()
-        && which.status.success()
-    {
-        let mut new_cmd = vec![
-            "systemd-inhibit",
-            "--who=lapctl",
-            "--why",
-            "Rebuilding initramfs",
-            "--",
-        ];
-        new_cmd.extend(command.iter());
-        command = new_cmd;
-    }
-
     if !command.is_empty() {
         println!("Rebuilding the initramfs...");
         let is_debug = log::log_enabled!(log::Level::Debug);
