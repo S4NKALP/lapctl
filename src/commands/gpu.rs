@@ -7,13 +7,58 @@ use crate::utils::system::{
     assert_root, create_file, get_active_graphical_sessions, get_display_manager,
     is_service_active, manage_service, rebuild_initramfs, terminate_session,
 };
+use fs2::FileExt;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use zbus::Connection;
 use zbus::proxy;
+
+static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+
+fn setup_signal_handler() {
+    let _ = ctrlc::set_handler(|| {
+        INTERRUPTED.store(true, Ordering::SeqCst);
+    });
+}
+
+struct DmGuard {
+    name: Option<String>,
+}
+
+impl Drop for DmGuard {
+    fn drop(&mut self) {
+        if let Some(ref name) = self.name {
+            info!("Restarting display manager: {}", name);
+            let _ = manage_service(name, "start");
+        }
+    }
+}
+
+const LOCK_PATH: &str = "/var/lock/lapctl.lock";
+
+struct LockGuard;
+
+impl LockGuard {
+    fn acquire() -> Result<Self, String> {
+        let file = fs::File::create(LOCK_PATH)
+            .map_err(|e| format!("Failed to create lock file: {}", e))?;
+        file.try_lock_exclusive()
+            .map_err(|e| format!("Another GPU switch operation is already in progress: {}", e))?;
+        info!("Acquired exclusive lock");
+        Ok(LockGuard)
+    }
+}
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(LOCK_PATH);
+        info!("Released lock");
+    }
+}
 
 #[proxy(
     interface = "org.lapctl1",
@@ -414,10 +459,15 @@ fn create_cache_file() {
         let _ = fs::create_dir_all(parent);
     }
 
-    if let Ok(json) = serde_json::to_string_pretty(&cache)
-        && fs::write(CACHE_FILE_PATH, json).is_ok()
-    {
-        log::debug!("Created/Updated cache file {}", CACHE_FILE_PATH);
+    if let Ok(json) = serde_json::to_string_pretty(&cache) {
+        let tmp_path = format!("{}.tmp", CACHE_FILE_PATH);
+        if fs::write(&tmp_path, &json).is_ok() {
+            if fs::rename(&tmp_path, CACHE_FILE_PATH).is_ok() {
+                log::debug!("Created/Updated cache file {}", CACHE_FILE_PATH);
+            } else {
+                let _ = fs::remove_file(&tmp_path);
+            }
+        }
     }
 }
 
@@ -435,7 +485,8 @@ fn read_cache_file() -> Result<Cache, String> {
     }
 }
 
-fn prepare_no_reboot(dm_flag: Option<String>) -> Result<Option<String>, String> {
+fn prepare_no_reboot(dm_flag: Option<String>) -> Result<DmGuard, String> {
+    setup_signal_handler();
     let dm_name = dm_flag.or_else(get_display_manager);
 
     if let Some(ref name) = dm_name
@@ -443,7 +494,9 @@ fn prepare_no_reboot(dm_flag: Option<String>) -> Result<Option<String>, String> 
     {
         info!("Stopping display manager: {}", name);
         manage_service(name, "stop")?;
-        return Ok(Some(name.clone()));
+        return Ok(DmGuard {
+            name: Some(name.clone()),
+        });
     }
 
     // If no active DM found, check for graphical sessions
@@ -460,18 +513,18 @@ fn prepare_no_reboot(dm_flag: Option<String>) -> Result<Option<String>, String> 
         std::thread::sleep(std::time::Duration::from_secs(2));
     }
 
-    Ok(None)
-}
-
-fn finalize_no_reboot(stopped_dm: Option<String>) {
-    if let Some(name) = stopped_dm {
-        info!("Starting display manager: {}", name);
-        let _ = manage_service(&name, "start");
-    }
+    Ok(DmGuard { name: None })
 }
 
 fn switch_integrated(no_reboot: bool) {
     assert_root();
+    let _lock = match LockGuard::acquire() {
+        Ok(l) => l,
+        Err(e) => {
+            error!("{}", e);
+            return;
+        }
+    };
     println!("Switching to integrated mode");
 
     if !Path::new(CACHE_FILE_PATH).exists() {
@@ -483,15 +536,14 @@ fn switch_integrated(no_reboot: bool) {
     create_file(BLACKLIST_PATH, BLACKLIST_CONTENT, false);
     create_file(UDEV_INTEGRATED_PATH, UDEV_INTEGRATED, false);
 
-    let mut stopped_dm = None;
-    if no_reboot {
-        match prepare_no_reboot(None) {
-            Ok(dm) => stopped_dm = dm,
+    let _guard = if no_reboot {
+        let guard = match prepare_no_reboot(None) {
+            Ok(g) => g,
             Err(e) => {
                 error!("{}", e);
                 return;
             }
-        }
+        };
 
         if let Err(e) = kill_gpu_processes() {
             error!("Failed to kill GPU processes: {}", e);
@@ -511,7 +563,11 @@ fn switch_integrated(no_reboot: bool) {
                 error!("Failed to remove GPU: {}", e);
             }
         }
-    }
+
+        guard
+    } else {
+        DmGuard { name: None }
+    };
 
     let is_debug = log::log_enabled!(log::Level::Debug);
     let mut dis_cmd = Command::new("systemctl");
@@ -527,7 +583,6 @@ fn switch_integrated(no_reboot: bool) {
 
     if no_reboot {
         println!("Operation completed successfully");
-        finalize_no_reboot(stopped_dm);
     } else {
         rebuild_initramfs();
         println!("Operation completed successfully");
@@ -537,6 +592,13 @@ fn switch_integrated(no_reboot: bool) {
 
 fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool, no_reboot: bool) {
     assert_root();
+    let _lock = match LockGuard::acquire() {
+        Ok(l) => l,
+        Err(e) => {
+            error!("{}", e);
+            return;
+        }
+    };
     println!("Switching to hybrid mode");
     println!(
         "Enable PCI-Express Runtime D3 (RTD3) Power Management: {}",
@@ -553,20 +615,23 @@ fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool, no_reboot: bool) {
 
     cleanup();
 
-    let mut stopped_dm = None;
-    if no_reboot {
-        match prepare_no_reboot(None) {
-            Ok(dm) => stopped_dm = dm,
+    let _guard = if no_reboot {
+        let guard = match prepare_no_reboot(None) {
+            Ok(g) => g,
             Err(e) => {
                 error!("{}", e);
                 return;
             }
-        }
+        };
 
         if let Err(e) = kill_gpu_processes() {
             error!("Failed to kill GPU processes: {}", e);
         }
-    }
+
+        guard
+    } else {
+        DmGuard { name: None }
+    };
 
     // persistenced enable
     let is_debug = log::log_enabled!(log::Level::Debug);
@@ -606,7 +671,6 @@ fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool, no_reboot: bool) {
 
     if no_reboot {
         println!("Operation completed successfully");
-        finalize_no_reboot(stopped_dm);
     } else {
         rebuild_initramfs();
         println!("Operation completed successfully");
@@ -623,6 +687,13 @@ fn switch_nvidia(
     no_reboot: bool,
 ) {
     assert_root();
+    let _lock = match LockGuard::acquire() {
+        Ok(l) => l,
+        Err(e) => {
+            error!("{}", e);
+            return;
+        }
+    };
 
     let wayland = wayland || is_wayland_session();
 
@@ -716,20 +787,23 @@ fn switch_nvidia(
         }
     }
 
-    let mut stopped_dm = None;
-    if no_reboot {
-        match prepare_no_reboot(dm.clone()) {
-            Ok(dm_name) => stopped_dm = dm_name,
+    let _guard = if no_reboot {
+        let guard = match prepare_no_reboot(dm.clone()) {
+            Ok(g) => g,
             Err(e) => {
                 error!("{}", e);
                 return;
             }
-        }
+        };
 
         if let Err(e) = kill_gpu_processes() {
             error!("Failed to kill GPU processes: {}", e);
         }
-    }
+
+        guard
+    } else {
+        DmGuard { name: None }
+    };
 
     // persistenced enable
     let is_debug = log::log_enabled!(log::Level::Debug);
@@ -746,7 +820,6 @@ fn switch_nvidia(
 
     if no_reboot {
         println!("Operation completed successfully");
-        finalize_no_reboot(stopped_dm);
     } else {
         rebuild_initramfs();
         println!("Operation completed successfully");

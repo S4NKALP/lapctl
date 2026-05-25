@@ -112,14 +112,23 @@ pub fn execute() {
         .args(["enable", "--now", "lapctld"])
         .status();
 
-    if let Ok(s) = status {
+    let daemon_ok = if let Ok(s) = status {
         if s.success() {
             info!("lapctld daemon enabled and started.");
+            true
         } else {
             log::error!("Failed to enable/start lapctld daemon.");
+            false
         }
-    }
+    } else {
+        false
+    };
 
-    println!("Installation successful! The lapctld daemon is now running.");
+    if daemon_ok {
+        println!("Installation successful! The lapctld daemon is now running.");
+    } else {
+        println!("Installation completed (but daemon may not be running).");
+        println!("Try starting it manually with: systemctl start lapctld");
+    }
     println!("You can now use all lapctl commands from any location.");
 }
