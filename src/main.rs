@@ -31,7 +31,13 @@ fn main() {
         Commands::InstallRules => commands::install_rules::execute(),
         Commands::Touchpad { command } => commands::touchpad::execute(command),
         Commands::Daemon => {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt,
+                Err(e) => {
+                    eprintln!("Failed to create tokio runtime: {}", e);
+                    std::process::exit(1);
+                }
+            };
             rt.block_on(async {
                 if let Err(e) = lapctl::daemon::run().await {
                     eprintln!("Daemon error: {}", e);
