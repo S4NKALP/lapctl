@@ -209,6 +209,10 @@ fn set_amd_hwmon_limit(watts: u32) -> bool {
     }
     success
 }
+fn is_ideapad() -> bool {
+    Path::new("/sys/bus/platform/drivers/ideapad_acpi").exists()
+}
+
 fn set_platform_profile(profile: &str) {
     let platform_profile_path = Path::new("/sys/firmware/acpi/platform_profile");
     if platform_profile_path.exists() {
@@ -242,21 +246,39 @@ pub fn execute_local(command: &PowerCommands) {
     match command {
         PowerCommands::Performance => {
             println!("Setting power profile to Performance");
-            set_platform_profile("performance");
+            if !is_ideapad() {
+                set_platform_profile("performance");
+            } else {
+                println!(
+                    "Skipping platform_profile (decoupled from fan control on Ideapad). Use 'lapctl cooling' for fan speed."
+                );
+            }
             set_cpu_governor("performance");
             set_energy_performance_preference("performance");
             println!("Operation completed successfully.");
         }
         PowerCommands::Balanced => {
             println!("Setting power profile to Balanced");
-            set_platform_profile("balanced");
+            if !is_ideapad() {
+                set_platform_profile("balanced");
+            } else {
+                println!(
+                    "Skipping platform_profile (decoupled from fan control on Ideapad). Use 'lapctl cooling' for fan speed."
+                );
+            }
             set_cpu_governor("schedutil");
             set_energy_performance_preference("balance_performance");
             println!("Operation completed successfully.");
         }
         PowerCommands::BatterySave => {
             println!("Setting power profile to Battery Saver");
-            set_platform_profile("low-power");
+            if !is_ideapad() {
+                set_platform_profile("low-power");
+            } else {
+                println!(
+                    "Skipping platform_profile (decoupled from fan control on Ideapad). Use 'lapctl cooling' for fan speed."
+                );
+            }
             set_cpu_governor("powersave");
             set_energy_performance_preference("power");
             println!("Operation completed successfully.");
