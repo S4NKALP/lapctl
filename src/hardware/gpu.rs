@@ -119,12 +119,17 @@ pub fn rescan_pci() -> Result<(), String> {
 pub fn kill_gpu_processes() -> Result<(), String> {
     info!("Killing processes using NVIDIA GPU...");
     // Try using fuser first as it is more likely to be available and easy to use
-    let _ = Command::new("fuser").args(["-k", "/dev/nvidia*"]).output();
+    if let Err(e) = Command::new("fuser").args(["-k", "/dev/nvidia*"]).output() {
+        log::warn!("fuser failed (may not be installed): {}", e);
+    }
 
     // Also kill specific nvidia services if they are running
-    let _ = Command::new("systemctl")
+    if let Err(e) = Command::new("systemctl")
         .args(["stop", "nvidia-persistenced.service"])
-        .output();
+        .output()
+    {
+        log::debug!("Failed to stop nvidia-persistenced: {}", e);
+    }
 
     Ok(())
 }
