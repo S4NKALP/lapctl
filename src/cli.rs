@@ -55,7 +55,7 @@ pub enum Commands {
     Daemon,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum GpuCommands {
     /// Query the current graphics mode
     Query,
