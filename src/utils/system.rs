@@ -17,8 +17,12 @@ pub fn assert_root() {
 
                 match status {
                     Ok(s) if s.success() => std::process::exit(0),
-                    _ => {
-                        error!("Privilege escalation failed or was cancelled.");
+                    Ok(s) => {
+                        error!("Privilege escalation failed with exit code: {}", s);
+                        std::process::exit(1);
+                    }
+                    Err(e) => {
+                        error!("Privilege escalation failed: {}", e);
                         std::process::exit(1);
                     }
                 }
@@ -49,8 +53,11 @@ pub fn create_file(path: &str, content: &str, executable: bool) {
 
             if executable && let Ok(mut perms) = fs::metadata(path_obj).map(|m| m.permissions()) {
                 perms.set_mode(perms.mode() | 0o111);
-                let _ = fs::set_permissions(path_obj, perms);
-                info!("Added execution privilege to file {}", path);
+                if let Err(e) = fs::set_permissions(path_obj, perms) {
+                    error!("Failed to set executable permission on '{}': {}", path, e);
+                } else {
+                    info!("Added execution privilege to file {}", path);
+                }
             }
         }
         Err(e) => {
@@ -164,8 +171,11 @@ pub fn rebuild_initramfs() {
             Ok(status) if status.success() => {
                 println!("Successfully rebuilt the initramfs!");
             }
-            _ => {
-                error!("An error occurred while rebuilding the initramfs");
+            Ok(status) => {
+                error!("initramfs rebuild failed with exit code: {}", status);
+            }
+            Err(e) => {
+                error!("Failed to run initramfs rebuild command: {}", e);
             }
         }
     } else {
@@ -181,7 +191,14 @@ pub fn manage_service(name: &str, action: &str) -> Result<(), String> {
     cmd.args([action, name]);
     match cmd.status() {
         Ok(s) if s.success() => Ok(()),
-        _ => Err(format!("Failed to {} service {}", action, name)),
+        Ok(s) => Err(format!(
+            "systemctl {} {} failed with exit code: {}",
+            action, name, s
+        )),
+        Err(e) => Err(format!(
+            "Failed to run systemctl {} {}: {}",
+            action, name, e
+        )),
     }
 }
 
@@ -191,6 +208,10 @@ pub fn terminate_session(id: &str) -> Result<(), String> {
     cmd.args(["terminate-session", id]);
     match cmd.status() {
         Ok(s) if s.success() => Ok(()),
-        _ => Err(format!("Failed to terminate session {}", id)),
+        Ok(s) => Err(format!(
+            "loginctl terminate-session {} failed with exit code: {}",
+            id, s
+        )),
+        Err(e) => Err(format!("Failed to run loginctl: {}", e)),
     }
 }
