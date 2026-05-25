@@ -54,6 +54,12 @@ impl LapctlInterface {
     }
 
     pub async fn set_battery_limit(&self, percent: u32) -> zbus::fdo::Result<()> {
+        if percent == 0 || percent > 100 {
+            return Err(zbus::fdo::Error::InvalidArgs(format!(
+                "Invalid battery limit: {}. Must be between 1 and 100.",
+                percent
+            )));
+        }
         crate::commands::battery::execute_local(&crate::cli::BatteryCommands::Limit {
             percent: percent as u8,
         });
