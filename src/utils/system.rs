@@ -168,6 +168,10 @@ pub fn rebuild_initramfs() {
                 error!("An error occurred while rebuilding the initramfs");
             }
         }
+    } else {
+        log::warn!(
+            "Unknown distribution: initramfs was not rebuilt. You may need to rebuild it manually before rebooting."
+        );
     }
 }
 
