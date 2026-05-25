@@ -12,17 +12,17 @@
 
 ### Why lapctl?
 
-Built with performance and simplicity in mind, it talks directly to your system's hardware interfaces (`sysfs`, `acpi`, `udev`). A high-performance background daemon (**lapctld**) handles all privileged operations via a secure D-Bus interface, allowing you to control your laptop completely **without sudo**.
+Built for speed and simplicity, it talks directly to your system's hardware interfaces (`sysfs`, `acpi`, `udev`). A background daemon (**lapctld**) handles all privileged operations via a secure D-Bus interface, allowing you to control your laptop completely **without sudo**.
 
 ---
 
 ### Key Features
 
-- **Graphics Switching**: Effortlessly toggle between Integrated, NVIDIA, and Hybrid modes. Optimize for battery life on the go or raw performance at your desk.
+- **Graphics Switching**: Effortlessly toggle between Integrated, NVIDIA, and Hybrid modes. Wayland is auto detected; no `--wayland` flag needed. Optimize for battery life on the go or raw performance at your desk.
 - **Battery Health**: Modern batteries hate being at 100% all the time. Set custom charge limits (like 80%) to significantly extend your battery's lifespan.
 - **Power Tuning**: Switch through performance profiles or set hard CPU power (TDP) limits in Watts to keep things cool or let them loose.
 - **Intelligent Cooling**: Force your fans into Performance, Balanced, or Quiet modes (supporting ASUS and Lenovo laptops).
-- **Display Refresh Rate**: Easily query available refresh rates and change your active display's Hz on-the-fly (100% native Rust Wayland implementation using `zwlr_output_manager_v1` for wlroots compositors like Sway and Hyprland).
+- **Display Refresh Rate**: Easily query available refresh rates and change your active display's Hz on the fly (100% native Rust Wayland implementation using `zwlr_output_manager_v1` for wlroots compositors like Sway and Hyprland).
 - **Touchpad Toggle**: Quickly enable or disable your touchpad from the terminal when using an external mouse.
 - **Instant Status**: Get a bird's eye view of your hardware state, battery health, and current limits with one simple command.
 
@@ -58,7 +58,7 @@ sudo lapctl install-rules
 
 #### Requirements
 
-- **GPU Switching (Optional)**: `xrandr` and `nvidia-settings` are strictly required **ONLY** when using the `lapctl gpu` command on X11 (to route proprietary NVIDIA Optimus drivers).
+- **GPU Switching (Optional)**: `xrandr` and `nvidia-settings` are strictly required **ONLY** when using the `lapctl gpu` command on X11 (to route proprietary NVIDIA Optimus drivers). Wayland is auto detected so no extra flags are needed.
 - **Wayland Display**: Built entirely natively using `wayland-client` and `wayland-protocols-wlr` (no `wlr-randr` required!)
 
 #### Limitations
@@ -76,10 +76,11 @@ sudo lapctl install-rules
 # From now on, NO sudo is required!
 
 # Manage your GPU
-lapctl gpu integrated  # Max battery
-lapctl gpu hybrid      # Best of both worlds
-lapctl gpu nvidia      # High performance
-lapctl gpu run steam   # Run 'steam' on dGPU directly while in Hybrid mode
+lapctl gpu integrated       # Max battery
+lapctl gpu hybrid           # Best of both worlds
+lapctl gpu nvidia           # High performance
+lapctl gpu nvidia --no-reboot  # Switch without rebooting (Ctrl+C safe)
+lapctl gpu run steam        # Run 'steam' on dGPU directly while in Hybrid mode
 
 # Prolong battery life
 lapctl battery limit 80
@@ -125,6 +126,11 @@ lapctl
 │
 └── tests/              # Robust integration & unit tests
 ```
+
+**Safety features:**
+- **Concurrency lock** -- Exclusive file lock (`/var/lock/lapctl.lock`) prevents concurrent GPU switch commands from corrupting state
+- **Interrupt safety** -- If `--no-reboot` GPU switching is interrupted (Ctrl+C, crash), the display manager is automatically restarted via a RAII guard
+- **Atomic writes** -- Cache file is written atomically (temp file + rename) to prevent partial/corrupt state on crash
 
 ---
 
