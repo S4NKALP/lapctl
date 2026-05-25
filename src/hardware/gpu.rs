@@ -21,30 +21,42 @@ pub fn get_current_mode() -> String {
 }
 
 pub fn get_nvidia_gpu_pci_bus() -> String {
-    let output = Command::new("lspci")
-        .output()
-        .expect("Failed to execute lspci");
+    let output = match Command::new("lspci").output() {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Failed to execute lspci: {}", e);
+            std::process::exit(1);
+        }
+    };
     let lspci_output = String::from_utf8_lossy(&output.stdout);
 
     for line in lspci_output.lines() {
         if line.contains("NVIDIA")
             && (line.contains("VGA compatible controller") || line.contains("3D controller"))
         {
-            let pci_bus_id_raw = line.split_whitespace().next().unwrap();
+            let pci_bus_id_raw = match line.split_whitespace().next() {
+                Some(id) => id,
+                None => continue,
+            };
             let pci_bus_id = pci_bus_id_raw.replace("0000:", "");
             info!("Found Nvidia GPU at {}", pci_bus_id);
 
             let parts: Vec<&str> = pci_bus_id.split(':').collect();
-            let bus = parts[0];
+            if parts.len() < 2 {
+                warn!("Unexpected PCI bus ID format: {}", pci_bus_id);
+                continue;
+            }
             let device_fun: Vec<&str> = parts[1].split('.').collect();
-            let device = device_fun[0];
-            let function = device_fun[1];
+            if device_fun.len() < 2 {
+                warn!("Unexpected PCI device.function format: {}", parts[1]);
+                continue;
+            }
 
             return format!(
                 "PCI:{}:{}:{}",
-                u32::from_str_radix(bus, 16).unwrap_or(0),
-                u32::from_str_radix(device, 16).unwrap_or(0),
-                u32::from_str_radix(function, 16).unwrap_or(0)
+                u32::from_str_radix(parts[0], 16).unwrap_or(0),
+                u32::from_str_radix(device_fun[0], 16).unwrap_or(0),
+                u32::from_str_radix(device_fun[1], 16).unwrap_or(0)
             );
         }
     }
@@ -55,16 +67,14 @@ pub fn get_nvidia_gpu_pci_bus() -> String {
 }
 
 pub fn get_nvidia_gpu_pci_addr() -> Option<String> {
-    let output = Command::new("lspci")
-        .output()
-        .expect("Failed to execute lspci");
+    let output = Command::new("lspci").output().ok()?;
     let lspci_output = String::from_utf8_lossy(&output.stdout);
 
     for line in lspci_output.lines() {
         if line.contains("NVIDIA")
             && (line.contains("VGA compatible controller") || line.contains("3D controller"))
         {
-            let pci_addr = line.split_whitespace().next().unwrap();
+            let pci_addr = line.split_whitespace().next()?;
             if pci_addr.contains(':') {
                 if pci_addr.chars().filter(|&c| c == ':').count() == 1 {
                     return Some(format!("0000:{}", pci_addr));
