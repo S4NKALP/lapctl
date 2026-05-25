@@ -20,9 +20,11 @@ use zbus::proxy;
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 
 fn setup_signal_handler() {
-    let _ = ctrlc::set_handler(|| {
+    if let Err(e) = ctrlc::set_handler(|| {
         INTERRUPTED.store(true, Ordering::SeqCst);
-    });
+    }) {
+        log::debug!("Could not set Ctrl+C handler (may already be set): {}", e);
+    }
 }
 
 struct DmGuard {
@@ -33,7 +35,9 @@ impl Drop for DmGuard {
     fn drop(&mut self) {
         if let Some(ref name) = self.name {
             info!("Restarting display manager: {}", name);
-            let _ = manage_service(name, "start");
+            if let Err(e) = manage_service(name, "start") {
+                error!("Failed to restart display manager '{}': {}", name, e);
+            }
         }
     }
 }
@@ -55,7 +59,9 @@ impl LockGuard {
 
 impl Drop for LockGuard {
     fn drop(&mut self) {
-        let _ = fs::remove_file(LOCK_PATH);
+        if let Err(e) = fs::remove_file(LOCK_PATH) {
+            log::debug!("Failed to remove lock file: {}", e);
+        }
         info!("Released lock");
     }
 }
@@ -455,8 +461,10 @@ fn create_cache_file() {
     let bus_id = get_nvidia_gpu_pci_bus();
     let cache = create_cache_obj(bus_id);
 
-    if let Some(parent) = Path::new(CACHE_FILE_PATH).parent() {
-        let _ = fs::create_dir_all(parent);
+    if let Some(parent) = Path::new(CACHE_FILE_PATH).parent()
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        log::debug!("Failed to create cache directory: {}", e);
     }
 
     if let Ok(json) = serde_json::to_string_pretty(&cache) {
@@ -465,7 +473,10 @@ fn create_cache_file() {
             if fs::rename(&tmp_path, CACHE_FILE_PATH).is_ok() {
                 log::debug!("Created/Updated cache file {}", CACHE_FILE_PATH);
             } else {
-                let _ = fs::remove_file(&tmp_path);
+                if let Err(e) = fs::remove_file(&tmp_path) {
+                    log::debug!("Failed to remove stale temp cache file: {}", e);
+                }
+                log::debug!("Failed to rename temp cache file");
             }
         }
     }
@@ -552,7 +563,9 @@ fn switch_integrated(no_reboot: bool) {
         // Try to unload modules
         let modules = ["nvidia_uvm", "nvidia_modeset", "nvidia_drm", "nvidia"];
         for module in modules {
-            let _ = Command::new("modprobe").args(["-r", module]).status();
+            if let Err(e) = Command::new("modprobe").args(["-r", module]).status() {
+                log::debug!("Failed to run modprobe -r {}: {}", module, e);
+            }
         }
 
         if let Some(pci_addr) = get_nvidia_gpu_pci_addr() {
@@ -578,7 +591,11 @@ fn switch_integrated(no_reboot: bool) {
     }
     match dis_cmd.status() {
         Ok(s) if s.success() => println!("Successfully disabled nvidia-persistenced.service"),
-        _ => error!("An error ocurred while disabling service"),
+        Ok(s) => error!(
+            "nvidia-persistenced.service disable failed with exit code: {}",
+            s
+        ),
+        Err(e) => error!("Failed to run systemctl: {}", e),
     }
 
     if no_reboot {
@@ -643,7 +660,11 @@ fn switch_hybrid(rtd3: Option<u8>, use_nvidia_current: bool, no_reboot: bool) {
     }
     match enable_cmd.status() {
         Ok(s) if s.success() => println!("Successfully enabled nvidia-persistenced.service"),
-        _ => error!("An error ocurred while enabling service"),
+        Ok(s) => error!(
+            "nvidia-persistenced.service enable failed with exit code: {}",
+            s
+        ),
+        Err(e) => error!("Failed to run systemctl: {}", e),
     }
 
     if let Some(val) = rtd3 {
@@ -815,7 +836,11 @@ fn switch_nvidia(
     }
     match enable_cmd.status() {
         Ok(s) if s.success() => println!("Successfully enabled nvidia-persistenced.service"),
-        _ => error!("An error ocurred while enabling service"),
+        Ok(s) => error!(
+            "nvidia-persistenced.service enable failed with exit code: {}",
+            s
+        ),
+        Err(e) => error!("Failed to run systemctl: {}", e),
     }
 
     if no_reboot {
@@ -914,9 +939,13 @@ pub fn execute_local(cmd: &GpuCommands) {
         GpuCommands::CacheDelete => {
             assert_root();
             if Path::new(CACHE_FILE_PATH).exists() {
-                let _ = fs::remove_file(CACHE_FILE_PATH);
-                if let Some(parent) = Path::new(CACHE_FILE_PATH).parent() {
-                    let _ = fs::remove_dir(parent);
+                if let Err(e) = fs::remove_file(CACHE_FILE_PATH) {
+                    error!("Failed to remove cache file: {}", e);
+                }
+                if let Some(parent) = Path::new(CACHE_FILE_PATH).parent()
+                    && let Err(e) = fs::remove_dir(parent)
+                {
+                    log::debug!("Failed to remove cache directory: {}", e);
                 }
             }
         }
@@ -936,9 +965,13 @@ pub fn execute_local(cmd: &GpuCommands) {
 
             cleanup();
             if Path::new(CACHE_FILE_PATH).exists() {
-                let _ = fs::remove_file(CACHE_FILE_PATH);
-                if let Some(parent) = Path::new(CACHE_FILE_PATH).parent() {
-                    let _ = fs::remove_dir(parent);
+                if let Err(e) = fs::remove_file(CACHE_FILE_PATH) {
+                    error!("Failed to remove cache file: {}", e);
+                }
+                if let Some(parent) = Path::new(CACHE_FILE_PATH).parent()
+                    && let Err(e) = fs::remove_dir(parent)
+                {
+                    log::debug!("Failed to remove cache directory: {}", e);
                 }
             }
             rebuild_initramfs();

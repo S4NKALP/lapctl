@@ -1,5 +1,5 @@
 use crate::utils::system::{assert_root, create_file};
-use log::info;
+use log::{error, info};
 use std::process::Command;
 
 // No longer needed: all privileged operations are now handled by the lapctld daemon via D-Bus.
@@ -76,8 +76,20 @@ WantedBy=multi-user.target
 pub fn execute() {
     assert_root();
 
-    let current_exe = std::env::current_exe().expect("Failed to get current executable path");
-    let exe_path = current_exe.to_str().expect("Invalid executable path");
+    let current_exe = match std::env::current_exe() {
+        Ok(exe) => exe,
+        Err(e) => {
+            error!("Failed to get current executable path: {}", e);
+            std::process::exit(1);
+        }
+    };
+    let exe_path = match current_exe.to_str() {
+        Some(p) => p,
+        None => {
+            error!("Executable path contains invalid UTF-8");
+            std::process::exit(1);
+        }
+    };
 
     println!("Found lapctl at: {}", exe_path);
     println!("Installing lapctl configuration with dynamic paths...");
@@ -105,23 +117,32 @@ pub fn execute() {
     println!("Activating background daemon (lapctld)...");
 
     // Reload systemd to recognize the new service
-    let _ = Command::new("systemctl").arg("daemon-reload").status();
+    if let Err(e) = Command::new("systemctl").arg("daemon-reload").status() {
+        error!("Failed to run systemctl daemon-reload: {}", e);
+        println!("You may need to run 'systemctl daemon-reload' manually.");
+    }
 
     // Enable and start the daemon
     let status = Command::new("systemctl")
         .args(["enable", "--now", "lapctld"])
         .status();
 
-    let daemon_ok = if let Ok(s) = status {
-        if s.success() {
+    let daemon_ok = match status {
+        Ok(s) if s.success() => {
             info!("lapctld daemon enabled and started.");
             true
-        } else {
-            log::error!("Failed to enable/start lapctld daemon.");
+        }
+        Ok(s) => {
+            log::error!(
+                "systemctl enable --now lapctld failed with exit code: {}",
+                s
+            );
             false
         }
-    } else {
-        false
+        Err(e) => {
+            log::error!("Failed to run systemctl: {}", e);
+            false
+        }
     };
 
     if daemon_ok {
