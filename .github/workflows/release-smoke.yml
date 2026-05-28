@@ -48,7 +48,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Setup pacman
-        uses: archlinux/actions/setup-pacman@v1
+        uses: archlinux/setup-pacman@v1
         with:
           update: true
       - name: Install base-devel (for makepkg)
