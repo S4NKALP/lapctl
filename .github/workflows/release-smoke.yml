@@ -67,7 +67,7 @@ jobs:
       - name: Push to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v2.5.0
         with:
-          pkgname: lapctl
+          pkgname: lapctl-bin
           pkgver: ${{ steps.version.outputs.version }}
           assets: |
             aur-pkg/PKGBUILD
