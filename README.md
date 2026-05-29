@@ -35,26 +35,27 @@ Built for speed and simplicity, it talks directly to your system's hardware inte
 #### Option 1: Arch Linux (AUR)
 
 ```bash
-yay -S lapctl
+yay -S lapctl-bin
+sudo lapctl install-rules
 ```
 
-#### Option 2: Using `just` (Recommended for other distros)
-
-If you have [just](https://github.com/casey/just) installed:
+#### Option 2: crates.io
 
 ```bash
+cargo install lapctl
+sudo lapctl install-rules
+```
+
+#### Option 3: From source (using `just`)
+
+```bash
+git clone https://github.com/S4NKALP/lapctl.git
+cd lapctl
 just install
 sudo lapctl install-rules
 ```
 
 _The `install-rules` command automatically sets up the D-Bus policy and starts the `lapctld` background service._
-
-#### Option 3: Using `cargo`
-
-```bash
-cargo install --path .
-sudo lapctl install-rules
-```
 
 #### Requirements
 
