@@ -2,6 +2,7 @@
 name = "lapctl"
 version = "0.3.4"
 edition = "2024"
+authors = ["S4NKALP"]
 description = "CLI tool for managing laptop hardware features on Linux"
 license = "MIT"
 repository = "https://github.com/S4NKALP/lapctl"
