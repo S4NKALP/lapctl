@@ -78,5 +78,6 @@ jobs:
           pkgbuild: aur-pkg/PKGBUILD
           assets: aur-pkg/.SRCINFO
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          ssh_keyscan_types: rsa,ecdsa,ed25519
           commit_username: ${{ github.actor }}
           commit_email: ${{ github.actor }}@users.noreply.github.com
