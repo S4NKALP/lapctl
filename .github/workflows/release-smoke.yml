@@ -53,12 +53,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Setup pacman
-        uses: archlinux/setup-pacman@v1
-        with:
-          update: true
-      - name: Install base-devel (for makepkg)
-        run: sudo pacman -S --noconfirm --needed base-devel
       - name: Get version
         id: version
         run: echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -70,8 +64,9 @@ jobs:
           mkdir -p aur-pkg
           cargo aur --output aur-pkg
       - name: Generate .SRCINFO
-        working-directory: aur-pkg
-        run: makepkg --printsrcinfo > .SRCINFO
+        run: |
+          docker run --rm -v "$(pwd)/aur-pkg:/build" archlinux:latest \
+            bash -c "cd /build && makepkg --printsrcinfo > .SRCINFO"
       - name: Push to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v2.5.0
         with:
