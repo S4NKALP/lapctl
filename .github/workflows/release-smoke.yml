@@ -68,7 +68,7 @@ jobs:
       - name: Create tarball with binary
         run: |
           tar czf "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" \
-            --transform="s/^.*\///" lapctl
+            lapctl LICENSE
       - name: Generate PKGBUILD with cargo-aur
         run: |
           cargo install cargo-aur
