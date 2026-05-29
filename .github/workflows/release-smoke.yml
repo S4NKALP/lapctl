@@ -11,6 +11,8 @@ on:
       version:
         description: 'Version to publish (e.g. 0.3.4)'
         required: true
+permissions:
+  contents: write
 env:
   CARGO_TERM_COLOR: always
 jobs:
