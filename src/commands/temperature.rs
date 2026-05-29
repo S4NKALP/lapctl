@@ -43,10 +43,7 @@ pub fn execute() {
                         other => other,
                     };
 
-                    println!(
-                        "  {} ({}): {:.1}°C",
-                        display_name, label_str, celsius
-                    );
+                    println!("  {} ({}): {:.1}°C", display_name, label_str, celsius);
                     found = true;
                 }
 
@@ -71,11 +68,7 @@ pub fn execute() {
                 && let Ok(temp_c) = temp.trim().parse::<f64>()
             {
                 let info = if parts.len() >= 3 {
-                    format!(
-                        " [{} @ {}]",
-                        parts[1].trim(),
-                        parts[2].trim()
-                    )
+                    format!(" [{} @ {}]", parts[1].trim(), parts[2].trim())
                 } else {
                     String::new()
                 };
@@ -102,18 +95,16 @@ pub fn execute() {
             let type_path = entry.path().join("type");
             let temp_path = entry.path().join("temp");
 
-            if let (Ok(type_content), Ok(temp_content)) =
-                (fs::read_to_string(&type_path), fs::read_to_string(&temp_path))
-            {
+            if let (Ok(type_content), Ok(temp_content)) = (
+                fs::read_to_string(&type_path),
+                fs::read_to_string(&temp_path),
+            ) {
                 let zone_type = type_content.trim();
                 let millideg: i64 = temp_content.trim().parse().unwrap_or(0);
                 let celsius = millideg as f64 / 1000.0;
 
                 // Skip if we already showed this from hwmon
-                if zone_type == "x86_pkg_temp"
-                    || zone_type == "k10temp"
-                    || zone_type == "acpitz"
-                {
+                if zone_type == "x86_pkg_temp" || zone_type == "k10temp" || zone_type == "acpitz" {
                     continue;
                 }
 

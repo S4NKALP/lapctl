@@ -208,11 +208,7 @@ pub fn execute() {
         if let Some(line) = stdout.lines().next() {
             let parts: Vec<&str> = line.split(", ").collect();
             if parts.len() >= 2 {
-                    println!(
-                        "GPU: {} @ {}°C (NVIDIA)",
-                        parts[0].trim(),
-                        parts[1].trim()
-                    );
+                println!("GPU: {} @ {}°C (NVIDIA)", parts[0].trim(), parts[1].trim());
             }
         }
     }
