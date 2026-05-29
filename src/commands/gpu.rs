@@ -854,37 +854,130 @@ fn switch_nvidia(
 
 fn run_on_dgpu(command: &[String]) {
     if command.is_empty() {
-        error!("No command provided to run.");
+        error!("No command specified.");
         return;
     }
 
     if get_current_mode() != "hybrid" {
-        log::warn!(
-            "Running on dGPU is typically only effective in Hybrid mode. \
-             Your current mode is '{}'. The application may fail to start or \
-             not use the NVIDIA GPU.",
-            get_current_mode()
-        );
+        error!("GPU run is only supported in Hybrid mode.");
+        return;
     }
 
-    log::info!("Launching '{}' on the discrete GPU...", command.join(" "));
+    let env_vars = vec![
+        (
+            "__NV_PRIME_RENDER_OFFLOAD",
+            "1".to_string(),
+        ),
+        (
+            "__GLX_VENDOR_LIBRARY_NAME",
+            "nvidia".to_string(),
+        ),
+        (
+            "__VK_LAYER_NV_optimus",
+            "NVIDIA_only".to_string(),
+        ),
+    ];
 
-    let mut child = Command::new(&command[0]);
+    let mut cmd = Command::new(&command[0]);
     if command.len() > 1 {
-        child.args(&command[1..]);
+        cmd.args(&command[1..]);
     }
 
-    // Set PRIME offload variables natively
-    child.env("__NV_PRIME_RENDER_OFFLOAD", "1");
-    child.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
-    child.env("__VK_LAYER_NV_optimus", "NVIDIA_only");
+    for (key, value) in &env_vars {
+        cmd.env(key, value);
+    }
 
-    match child.status() {
+    info!("Running '{}' on discrete GPU", command.join(" "));
+
+    match cmd.status() {
         Ok(status) => {
-            log::info!("Application exited with: {}", status);
+            if !status.success() {
+                error!("Command exited with status: {}", status);
+            }
         }
         Err(e) => {
-            error!("Failed to launch application: {}", e);
+            error!("Failed to execute command: {}", e);
+        }
+    }
+}
+
+fn show_gpu_power_state() {
+    println!("--- GPU Power State ---");
+
+    // Read PCI power state from sysfs
+    let pci_base = Path::new("/sys/bus/pci/devices");
+    if let Ok(entries) = fs::read_dir(pci_base) {
+        for entry in entries.flatten() {
+            let vendor_path = entry.path().join("vendor");
+            let class_path = entry.path().join("class");
+
+            let Ok(vendor) = fs::read_to_string(&vendor_path) else {
+                continue;
+            };
+            let Ok(class) = fs::read_to_string(&class_path) else {
+                continue;
+            };
+
+            // NVIDIA vendor = 0x10de, VGA class starts with 0x0300
+            if vendor.trim() == "0x10de" && class.trim().starts_with("0x0300") {
+                let pci_addr = entry.file_name().to_string_lossy().to_string();
+                println!("  Device: NVIDIA ({})", pci_addr);
+
+                // Power state
+                let runtime_status = entry.path().join("power/runtime_status");
+                if let Ok(status) = fs::read_to_string(&runtime_status) {
+                    println!("  Runtime Status: {}", status.trim());
+                }
+
+                // Power control
+                let power_control = entry.path().join("power/control");
+                if let Ok(control) = fs::read_to_string(&power_control) {
+                    println!("  Power Control: {}", control.trim());
+                }
+
+                // Current power state (D0 = fully on, D3 = off)
+                let current_state = entry.path().join("power_state");
+                if let Ok(state) = fs::read_to_string(&current_state) {
+                    println!("  PCI Power State: {}", state.trim());
+                }
+
+                // Max power state
+                let max_state = entry.path().join("max_power_state");
+                if let Ok(state) = fs::read_to_string(&max_state) {
+                    println!("  Max Power State: {}", state.trim());
+                }
+            }
+        }
+    }
+
+    // NVIDIA power info via nvidia-smi
+    match std::process::Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=power.draw,power.limit,power.default_limit,power.max_limit,clocks.current.graphics,clocks.max.graphics",
+            "--format=csv,noheader",
+        ])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split(", ").collect();
+                if parts.len() >= 5 {
+                    println!();
+                    println!("  Power Draw: {}", parts[0].trim());
+                    println!("  Power Limit: {}", parts[1].trim());
+                    println!("  Default Limit: {}", parts[2].trim());
+                    println!("  Max Limit: {}", parts[3].trim());
+                    println!("  Current Clock: {}", parts[4].trim());
+                    if parts.len() > 5 {
+                        println!("  Max Clock: {}", parts[5].trim());
+                    }
+                }
+            }
+        }
+        _ => {
+            log::debug!("nvidia-smi not available or GPU not powered on");
+            println!("  (nvidia-smi not available - GPU may be powered off)");
         }
     }
 }
@@ -1004,5 +1097,6 @@ pub fn execute_local(cmd: &GpuCommands) {
             *no_reboot,
         ),
         GpuCommands::Run { command } => run_on_dgpu(command),
+        GpuCommands::Power => show_gpu_power_state(),
     }
 }

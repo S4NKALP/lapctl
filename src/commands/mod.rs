@@ -1,8 +1,10 @@
 pub mod battery;
 pub mod cooling;
 pub mod display;
+pub mod fan;
 pub mod gpu;
 pub mod install_rules;
 pub mod power;
 pub mod status;
+pub mod temperature;
 pub mod touchpad;

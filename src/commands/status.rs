@@ -181,6 +181,42 @@ pub fn execute() {
         }
     }
 
+    // Temperature
+    if let Ok(temp_output) = fs::read_to_string("/sys/class/hwmon/hwmon5/temp1_input")
+        && let Ok(millideg) = temp_output.trim().parse::<i64>()
+    {
+        println!("CPU Temp: {:.1}°C", millideg as f64 / 1000.0);
+    }
+
+    // Fan Speed
+    if let Ok(fan_output) = fs::read_to_string("/sys/class/hwmon/hwmon1/fan1_input")
+        && let Ok(rpm) = fan_output.trim().parse::<u64>()
+    {
+        println!("Fan Speed: {} RPM", rpm);
+    }
+
+    // GPU Power State
+    if let Ok(output) = std::process::Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=power.draw,temperature.gpu",
+            "--format=csv,noheader",
+        ])
+        .output()
+        && output.status.success()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if let Some(line) = stdout.lines().next() {
+            let parts: Vec<&str> = line.split(", ").collect();
+            if parts.len() >= 2 {
+                    println!(
+                        "GPU: {} @ {}°C (NVIDIA)",
+                        parts[0].trim(),
+                        parts[1].trim()
+                    );
+            }
+        }
+    }
+
     // Display Status
     let displays = display::get_active_display_info();
     if displays.is_empty() {
