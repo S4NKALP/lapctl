@@ -75,10 +75,8 @@ jobs:
         uses: KSXGitHub/github-actions-deploy-aur@v2.5.0
         with:
           pkgname: lapctl-bin
-          pkgver: ${{ steps.version.outputs.version }}
-          assets: |
-            aur-pkg/PKGBUILD
-            aur-pkg/.SRCINFO
+          pkgbuild: aur-pkg/PKGBUILD
+          assets: aur-pkg/.SRCINFO
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: ${{ github.actor }}
           commit_email: ${{ github.actor }}@users.noreply.github.com
