@@ -98,7 +98,8 @@ jobs:
           commit_email: ${{ github.actor }}@users.noreply.github.com
           allow_empty_commits: true
           force_push: true
-          post_process: git checkout master
+          post_process: |
+            git add -A && git stash && git checkout master && git stash pop
       - name: Upload tarball to release
         if: github.ref_type == 'tag'
         env:
