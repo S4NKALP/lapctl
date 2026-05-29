@@ -58,11 +58,24 @@ jobs:
         run: echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
         env:
           VERSION: ${{ github.event.inputs.version || github.ref_name }}
+      - name: Download release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lapctl-${{ github.ref_name }}
+          path: .
+      - name: Create tarball with binary
+        run: |
+          tar czf "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" \
+            --transform="s/^.*\///" lapctl
       - name: Generate PKGBUILD with cargo-aur
         run: |
           cargo install cargo-aur
           mkdir -p aur-pkg
           cargo aur --output aur-pkg
+      - name: Update PKGBUILD checksums
+        run: |
+          SHA=$(sha256sum "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" | cut -d' ' -f1)
+          sed -i "s/sha256sums=([^)]*)/sha256sums=('$SHA')/" aur-pkg/PKGBUILD
       - name: Generate .SRCINFO
         run: |
           docker run --rm -v "$(pwd)/aur-pkg:/build" archlinux:latest \
@@ -81,14 +94,6 @@ jobs:
           ssh_keyscan_types: rsa,ecdsa,ed25519
           commit_username: ${{ github.actor }}
           commit_email: ${{ github.actor }}@users.noreply.github.com
-      - name: Download release binary
-        uses: actions/download-artifact@v4
-        with:
-          name: lapctl-${{ github.ref_name }}
-          path: .
-      - name: Create tarball for release
-        run: |
-          tar czf "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" lapctl
       - name: Upload tarball to release
         if: github.ref_type == 'tag'
         env:
