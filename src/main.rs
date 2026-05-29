@@ -28,6 +28,8 @@ fn main() {
         Commands::Cooling { command } => commands::cooling::execute(command),
         Commands::Display { command } => commands::display::execute(command),
         Commands::Status => commands::status::execute(),
+        Commands::Temperature => commands::temperature::execute(),
+        Commands::Fan => commands::fan::execute(),
         Commands::InstallRules => commands::install_rules::execute(),
         Commands::Touchpad { command } => commands::touchpad::execute(command),
         Commands::Daemon => {

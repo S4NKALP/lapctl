@@ -44,6 +44,10 @@ pub enum Commands {
     },
     /// Hardware status
     Status,
+    /// Show system temperatures
+    Temperature,
+    /// Show fan speeds
+    Fan,
     /// Install udev rules for rootless operation
     InstallRules,
     /// Touchpad management
@@ -114,6 +118,8 @@ pub enum GpuCommands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         command: Vec<String>,
     },
+    /// Show GPU power state and consumption
+    Power,
 }
 
 #[derive(Subcommand, Debug)]
