@@ -1,6 +1,6 @@
 [package]
 name = "lapctl"
-version = "0.3.4"
+version = "0.3.5"
 edition = "2024"
 authors = ["S4NKALP"]
 description = "CLI tool for managing laptop hardware features on Linux"
