@@ -99,7 +99,7 @@ jobs:
           allow_empty_commits: true
           force_push: true
           post_process: |
-            git add -A && git stash && git checkout master && git stash pop
+            git add -A && git stash && git checkout master && git checkout stash -- . && git stash drop
       - name: Upload tarball to release
         if: github.ref_type == 'tag'
         env:
