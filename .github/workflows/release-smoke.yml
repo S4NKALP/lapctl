@@ -81,3 +81,21 @@ jobs:
           ssh_keyscan_types: rsa,ecdsa,ed25519
           commit_username: ${{ github.actor }}
           commit_email: ${{ github.actor }}@users.noreply.github.com
+      - name: Download release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lapctl-${{ github.ref_name }}
+          path: .
+      - name: Create tarball for release
+        run: |
+          tar czf "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" lapctl
+      - name: Upload tarball to release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" --clobber 2>/dev/null ||
+          gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes "" &&
+          gh release upload "${{ github.ref_name }}" \
+            "lapctl-${{ steps.version.outputs.version }}-x86_64.tar.gz" --clobber
